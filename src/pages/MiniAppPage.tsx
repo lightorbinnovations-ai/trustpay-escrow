@@ -161,15 +161,12 @@ export default function MiniAppPage() {
   };
 
   useEffect(() => {
-    async function verifyMiniAppAdmin() {
-      if (!tgUser) return;
-      const { data, error } = await supabase.functions.invoke("verify-admin", {
-        body: { telegram_id: tgUser.id, username: tgUser.username },
-      });
-      if (!error && data?.authorized) setIsAdmin(true);
-      else setIsAdmin(false);
+    const ADMIN_USERNAMES = ["lightorbinnovations"];
+    if (tgUser?.username && ADMIN_USERNAMES.includes(tgUser.username.toLowerCase())) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
     }
-    verifyMiniAppAdmin();
   }, [tgUser]);
 
   const navigate = useCallback((to: View, dir: "forward" | "back" = "forward") => {

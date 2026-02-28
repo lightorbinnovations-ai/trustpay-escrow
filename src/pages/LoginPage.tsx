@@ -28,20 +28,14 @@ export default function LoginPage({ onLogin }: Props) {
     }
   }, []);
 
-  async function verifyAdmin(telegramId: number, username: string) {
-    try {
-      const { data, error: fnError } = await supabase.functions.invoke("verify-admin", {
-        body: { telegram_id: telegramId, username },
-      });
-      if (fnError) throw fnError;
-      if (data?.authorized) {
-        onLogin(username);
-      } else {
-        setError("You are not authorized to access this dashboard.");
-        setChecking(false);
-      }
-    } catch {
-      setError("Failed to verify admin access.");
+  async function verifyAdmin(_telegramId: number, username: string) {
+    const ADMIN_USERNAMES = ["lightorbinnovations"];
+    const isAuthorized = !!username && ADMIN_USERNAMES.includes(username.toLowerCase());
+
+    if (isAuthorized) {
+      onLogin(username);
+    } else {
+      setError("You are not authorized to access this dashboard.");
       setChecking(false);
     }
   }
