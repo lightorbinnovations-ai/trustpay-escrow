@@ -1,5 +1,6 @@
 import { LayoutDashboard, ArrowLeftRight, AlertTriangle, BarChart3, Shield, Settings, Bell, History, ShoppingBag, Store, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 import { usePlatformSettings } from "@/hooks/use-deals";
 
 interface Props {
@@ -22,6 +23,7 @@ const navItems = [
 ];
 
 export default function DashboardSidebar({ active, onNavigate, unreadCount, onNotifications }: Props) {
+  const navigate = useNavigate();
   const { data: settings } = usePlatformSettings();
   const adminName = settings?.admin_name || "Admin";
   const adminEmail = settings?.admin_email || "admin@trustpay9ja.ng";
@@ -64,6 +66,17 @@ export default function DashboardSidebar({ active, onNavigate, unreadCount, onNo
             )}
           </button>
         ))}
+
+        {/* User View Link */}
+        <div className="pt-2 mt-2 border-t border-sidebar-border/50">
+          <button
+            onClick={() => navigate("/miniapp")}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground transition-all duration-200 group"
+          >
+            <ShoppingBag className="w-[18px] h-[18px] group-hover:scale-110 transition-transform" />
+            User View
+          </button>
+        </div>
       </nav>
 
       {/* Notifications */}

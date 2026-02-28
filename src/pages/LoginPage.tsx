@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Shield, Loader2, ExternalLink } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function LoginPage({ onLogin }: Props) {
+  const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
 
@@ -35,8 +37,8 @@ export default function LoginPage({ onLogin }: Props) {
     if (isAuthorized) {
       onLogin(username);
     } else {
-      setError("You are not authorized to access this dashboard.");
-      setChecking(false);
+      // If not an admin, redirect to the normal Mini App page
+      navigate("/miniapp");
     }
   }
 
