@@ -58,6 +58,13 @@ serve(async (req) => {
     if (!TELEGRAM_BOT_TOKEN) throw new Error("TELEGRAM_BOT_TOKEN not set");
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Create a secondary client to access the Market project database
+    const marketSupabase = createClient(
+      Deno.env.get("MARKET_SUPABASE_URL") || Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("MARKET_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const body = await req.json();
     const message = body.message || body.callback_query?.message;
     const callbackData = body.callback_query?.data;
@@ -169,12 +176,12 @@ serve(async (req) => {
       if (adminChatId) {
         await sendMessage(adminChatId,
           `🔔 <b>Admin Alert: ${event}</b>\n${LINE}\n\n${details}\n${LINE}`,
-          { inline_keyboard: [[{ text: "🚀 Open Dashboard", web_app: { url: "https://trustpayescrow.lovable.app" } }]] }
+          { inline_keyboard: [[{ text: "🚀 Open Dashboard", web_app: { url: "https://trustpay-escrow.vercel.app" } }]] }
         );
       }
     }
 
-    const webAppUrl = "https://trustpayescrow.lovable.app/miniapp";
+    const webAppUrl = "https://trustpay-escrow.vercel.app";
     const mainMenuKeyboard = {
       inline_keyboard: [
         [{ text: "🚀 Open App", web_app: { url: webAppUrl } }],
@@ -203,31 +210,34 @@ serve(async (req) => {
       if (startParam.startsWith("escrow_")) {
         const listingId = startParam.replace("escrow_", "");
         try {
-          const { data: listing, error: listingErr } = await supabase
+          const { data: listing, error: listingErr } = await marketSupabase
             .from("listings").select("*").eq("id", listingId).maybeSingle();
           if (listingErr || !listing) {
             await sendMessage(chatId, `❌ Listing not found. Please check the link and try again.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
+
           if (listing.seller_telegram_id === fromUser?.id) {
             await sendMessage(chatId, `❌ You cannot buy your own listing.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          // Check for existing pending transaction
-          let { data: existingTx } = await supabase.from("transactions").select("*")
+          // Check for existing pending transaction in MARKET database
+          let { data: existingTx } = await marketSupabase.from("transactions").select("*")
             .eq("listing_id", listingId).eq("buyer_telegram_id", fromUser?.id).eq("status", "pending")
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
 
+
           if (!existingTx) {
-            const { data: newTx, error: txErr } = await supabase.from("transactions").insert({
+            const { data: newTx, error: txErr } = await marketSupabase.from("transactions").insert({
               listing_id: listingId,
               buyer_telegram_id: fromUser?.id,
               seller_telegram_id: listing.seller_telegram_id,
               amount: listing.price,
               status: "pending",
             }).select().single();
+
             if (txErr) {
               console.error("Transaction create error:", txErr);
               await sendMessage(chatId, `❌ Failed to create transaction. Please try again.`, mainMenuKeyboard);
@@ -236,9 +246,10 @@ serve(async (req) => {
             existingTx = newTx;
           }
 
-          // Get seller info
-          const { data: sellerUser } = await supabase.from("bot_users").select("first_name, username")
+          // Get seller info from MARKET database
+          const { data: sellerUser } = await marketSupabase.from("bot_users").select("first_name, username")
             .eq("telegram_id", listing.seller_telegram_id).maybeSingle();
+
           const sellerName = sellerUser?.username ? `@${sellerUser.username}` : (sellerUser?.first_name || `User ${listing.seller_telegram_id}`);
 
           await sendMessage(chatId,
@@ -1339,7 +1350,7 @@ serve(async (req) => {
       if (callbackData.startsWith("mkt_escrow_")) {
         const listingId = callbackData.replace("mkt_escrow_", "");
         try {
-          const { data: listing } = await supabase.from("listings").select("*").eq("id", listingId).maybeSingle();
+          const { data: listing } = await marketSupabase.from("listings").select("*").eq("id", listingId).maybeSingle();
           if (!listing) {
             await sendMessage(callbackChatId, `❌ Listing no longer available.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1350,11 +1361,11 @@ serve(async (req) => {
           }
 
           // Create or find pending transaction
-          let { data: existingTx } = await supabase.from("transactions").select("*")
+          let { data: existingTx } = await marketSupabase.from("transactions").select("*")
             .eq("listing_id", listingId).eq("buyer_telegram_id", body.callback_query.from.id).eq("status", "pending")
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           if (!existingTx) {
-            const { data: newTx } = await supabase.from("transactions").insert({
+            const { data: newTx } = await marketSupabase.from("transactions").insert({
               listing_id: listingId,
               buyer_telegram_id: body.callback_query.from.id,
               seller_telegram_id: listing.seller_telegram_id,
@@ -1364,8 +1375,9 @@ serve(async (req) => {
             existingTx = newTx;
           }
 
-          const { data: sellerUser } = await supabase.from("bot_users").select("first_name, username")
+          const { data: sellerUser } = await marketSupabase.from("bot_users").select("first_name, username")
             .eq("telegram_id", listing.seller_telegram_id).maybeSingle();
+
           const sellerName = sellerUser?.username ? `@${sellerUser.username}` : (sellerUser?.first_name || `User ${listing.seller_telegram_id}`);
 
           await sendMessage(callbackChatId,
@@ -1390,7 +1402,7 @@ serve(async (req) => {
       if (callbackData.startsWith("mkt_pay_")) {
         const txId = callbackData.replace("mkt_pay_", "");
         try {
-          const { data: tx } = await supabase.from("transactions").select("*").eq("id", txId).maybeSingle();
+          const { data: tx } = await marketSupabase.from("transactions").select("*").eq("id", txId).maybeSingle();
           if (!tx || tx.status !== "pending") {
             await sendMessage(callbackChatId, `❌ Transaction not found or already processed.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1400,14 +1412,15 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          await supabase.from("transactions").update({ status: "paid" }).eq("id", txId);
+          await marketSupabase.from("transactions").update({ status: "paid" }).eq("id", txId);
 
           // Get listing title
           let listingTitle = "Item";
           if (tx.listing_id) {
-            const { data: listing } = await supabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
+            const { data: listing } = await marketSupabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
             if (listing) listingTitle = listing.title;
           }
+
 
           // Notify buyer
           await sendMessage(callbackChatId,
@@ -1418,7 +1431,7 @@ serve(async (req) => {
           );
 
           // Notify seller via Telegram
-          const { data: buyerUser } = await supabase.from("bot_users").select("username, first_name")
+          const { data: buyerUser } = await marketSupabase.from("bot_users").select("username, first_name")
             .eq("telegram_id", tx.buyer_telegram_id).maybeSingle();
           const buyerName = buyerUser?.username ? `@${buyerUser.username}` : (buyerUser?.first_name || "Buyer");
 
@@ -1435,7 +1448,7 @@ serve(async (req) => {
           );
 
           // Insert notification
-          await supabase.from("notifications").insert({
+          await marketSupabase.from("notifications").insert({
             recipient_telegram_id: tx.seller_telegram_id,
             sender_telegram_id: tx.buyer_telegram_id,
             title: "Escrow Payment Received",
@@ -1443,6 +1456,7 @@ serve(async (req) => {
             type: "escrow_paid",
             listing_id: tx.listing_id,
           });
+
 
           await supabase.from("audit_logs").insert([{
             action: "marketplace_payment", actor: `tg:${tx.buyer_telegram_id}`,
@@ -1460,7 +1474,7 @@ serve(async (req) => {
       if (callbackData.startsWith("mkt_delivered_")) {
         const txId = callbackData.replace("mkt_delivered_", "");
         try {
-          const { data: tx } = await supabase.from("transactions").select("*").eq("id", txId).maybeSingle();
+          const { data: tx } = await marketSupabase.from("transactions").select("*").eq("id", txId).maybeSingle();
           if (!tx || tx.status !== "paid") {
             await sendMessage(callbackChatId, `❌ Transaction not in deliverable state.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1472,7 +1486,7 @@ serve(async (req) => {
 
           let listingTitle = "Item";
           if (tx.listing_id) {
-            const { data: listing } = await supabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
+            const { data: listing } = await marketSupabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
             if (listing) listingTitle = listing.title;
           }
 
@@ -1482,8 +1496,9 @@ serve(async (req) => {
           );
 
           // Ask buyer to confirm
-          const { data: sellerUser } = await supabase.from("bot_users").select("username, first_name")
+          const { data: sellerUser } = await marketSupabase.from("bot_users").select("username, first_name")
             .eq("telegram_id", tx.seller_telegram_id).maybeSingle();
+
           const sellerName = sellerUser?.username ? `@${sellerUser.username}` : (sellerUser?.first_name || "Seller");
 
           await sendMessage(tx.buyer_telegram_id,
@@ -1498,7 +1513,7 @@ serve(async (req) => {
             }
           );
 
-          await supabase.from("notifications").insert({
+          await marketSupabase.from("notifications").insert({
             recipient_telegram_id: tx.buyer_telegram_id,
             sender_telegram_id: tx.seller_telegram_id,
             title: "Item Delivered",
@@ -1506,6 +1521,7 @@ serve(async (req) => {
             type: "delivery_marked",
             listing_id: tx.listing_id,
           });
+
 
         } catch (e) {
           console.error("Marketplace delivered error:", e);
@@ -1518,7 +1534,7 @@ serve(async (req) => {
       if (callbackData.startsWith("mkt_received_")) {
         const txId = callbackData.replace("mkt_received_", "");
         try {
-          const { data: tx } = await supabase.from("transactions").select("*").eq("id", txId).maybeSingle();
+          const { data: tx } = await marketSupabase.from("transactions").select("*").eq("id", txId).maybeSingle();
           if (!tx || tx.status !== "paid") {
             await sendMessage(callbackChatId, `❌ Transaction cannot be confirmed.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1528,13 +1544,14 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          await supabase.from("transactions").update({ status: "released" }).eq("id", txId);
+          await marketSupabase.from("transactions").update({ status: "released" }).eq("id", txId);
 
           let listingTitle = "Item";
           if (tx.listing_id) {
-            const { data: listing } = await supabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
+            const { data: listing } = await marketSupabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
             if (listing) listingTitle = listing.title;
           }
+
 
           await sendMessage(callbackChatId,
             `🎉 <b>Transaction Complete!</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n\n` +
@@ -1543,8 +1560,9 @@ serve(async (req) => {
           );
 
           // Notify seller
-          const { data: buyerUser } = await supabase.from("bot_users").select("username, first_name")
+          const { data: buyerUser } = await marketSupabase.from("bot_users").select("username, first_name")
             .eq("telegram_id", tx.buyer_telegram_id).maybeSingle();
+
           const buyerName = buyerUser?.username ? `@${buyerUser.username}` : (buyerUser?.first_name || "Buyer");
 
           await sendMessage(tx.seller_telegram_id,
@@ -1553,7 +1571,7 @@ serve(async (req) => {
             mainMenuKeyboard
           );
 
-          await supabase.from("notifications").insert([
+          await marketSupabase.from("notifications").insert([
             {
               recipient_telegram_id: tx.seller_telegram_id,
               sender_telegram_id: tx.buyer_telegram_id,
@@ -1571,6 +1589,7 @@ serve(async (req) => {
             },
           ]);
 
+
           await supabase.from("audit_logs").insert([{
             action: "marketplace_released", actor: `tg:${tx.buyer_telegram_id}`,
             details: { tx_id: txId, amount: tx.amount, listing: listingTitle },
@@ -1587,7 +1606,7 @@ serve(async (req) => {
       if (callbackData.startsWith("mkt_dispute_")) {
         const txId = callbackData.replace("mkt_dispute_", "");
         try {
-          const { data: tx } = await supabase.from("transactions").select("*").eq("id", txId).maybeSingle();
+          const { data: tx } = await marketSupabase.from("transactions").select("*").eq("id", txId).maybeSingle();
           if (!tx || tx.status !== "paid") {
             await sendMessage(callbackChatId, `❌ Transaction cannot be disputed.`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1597,27 +1616,27 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          await supabase.from("transactions").update({ status: "disputed" }).eq("id", txId);
+          await marketSupabase.from("transactions").update({ status: "disputed" }).eq("id", txId);
 
           let listingTitle = "Item";
           if (tx.listing_id) {
-            const { data: listing } = await supabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
+            const { data: listing } = await marketSupabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
             if (listing) listingTitle = listing.title;
           }
 
           await sendMessage(callbackChatId,
             `⚠️ <b>Dispute Opened</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n\n` +
             `An admin will review this shortly. Funds are safely held.\n${LINE}`,
-            mainMenuKeyboard
+            { inline_keyboard: [[{ text: "🔙 Menu", callback_data: "open_start" }]] }
           );
 
           await sendMessage(tx.seller_telegram_id,
             `⚠️ <b>Dispute Opened on Your Sale</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n\n` +
             `The buyer has raised a concern. An admin will review.\n${LINE}`,
-            mainMenuKeyboard
+            { inline_keyboard: [[{ text: "🔙 Menu", callback_data: "open_start" }]] }
           );
 
-          await supabase.from("notifications").insert([
+          await marketSupabase.from("notifications").insert([
             {
               recipient_telegram_id: tx.seller_telegram_id,
               sender_telegram_id: tx.buyer_telegram_id,
@@ -1627,6 +1646,7 @@ serve(async (req) => {
               listing_id: tx.listing_id,
             },
           ]);
+
 
           await notifyAdmin("⚠️ Marketplace Dispute",
             `📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n👤 Buyer: tg:${tx.buyer_telegram_id}\n👤 Seller: tg:${tx.seller_telegram_id}`

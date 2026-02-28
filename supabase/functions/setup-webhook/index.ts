@@ -39,7 +39,7 @@ serve(async (req) => {
         menu_button: {
           type: "web_app",
           text: "Open App",
-          web_app: { url: "https://trustpayescrow.lovable.app/miniapp" },
+          web_app: { url: "https://trustpay-escrow.vercel.app" },
         },
       }),
     });
