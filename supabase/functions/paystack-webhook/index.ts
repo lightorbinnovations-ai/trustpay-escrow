@@ -15,6 +15,13 @@ serve(async (req) => {
     if (!PAYSTACK_SECRET_KEY) throw new Error("PAYSTACK_SECRET_KEY not set");
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // Market project client
+    const marketSupabase = createClient(
+      Deno.env.get("MARKET_SUPABASE_URL") || Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("MARKET_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     const rawBody = await req.text();
 
     // Validate webhook signature
@@ -56,6 +63,70 @@ serve(async (req) => {
       const reference = data.reference;
       const metadata = data.metadata || {};
       const dealId = metadata.deal_id;
+      const isMarketTx = metadata.type === "market_transaction";
+
+      if (isMarketTx) {
+        const marketTxId = metadata.tx_id;
+        if (!marketTxId) {
+          console.error("No market tx_id in metadata");
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        }
+
+        // 1. Update Market Transaction status to "paid"
+        await marketSupabase.from("transactions").update({
+          status: "paid",
+          funded_at: new Date().toISOString()
+        }).eq("id", marketTxId);
+
+        const listingTitle = metadata.listing_title || "Item";
+        const buyerChatId = metadata.buyer_chat_id;
+        const sellerTelegramId = metadata.seller_telegram_id;
+        const amount = data.amount / 100;
+
+        // 2. Notify Buyer
+        if (buyerChatId) {
+          await sendTelegram(buyerChatId,
+            `✅ <b>Payment Confirmed!</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `📝 <b>${listingTitle}</b>\n` +
+            `💰 Amount: ₦${amount.toLocaleString()}\n\n` +
+            `⏳ Waiting for seller to deliver. You'll be notified when they do.\n` +
+            `🔒 Funds are safely held in escrow.`
+          );
+        }
+
+        // 3. Notify Seller
+        if (sellerTelegramId) {
+          await sendTelegram(sellerTelegramId,
+            `💰 <b>Payment Received!</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `📝 <b>${listingTitle}</b>\n` +
+            `💰 Amount: ₦${amount.toLocaleString()}\n` +
+            `👤 Buyer: tg:${metadata.buyer_telegram_id}\n\n` +
+            `Please deliver the item and mark as delivered below.\n━━━━━━━━━━━━━━━━━━━━━━`,
+            {
+              inline_keyboard: [
+                [{ text: "📦 Mark Delivered", callback_data: `mkt_delivered_${marketTxId}` }],
+              ]
+            }
+          );
+
+          // 4. Insert Market Notification
+          await marketSupabase.from("notifications").insert({
+            recipient_telegram_id: sellerTelegramId,
+            sender_telegram_id: metadata.buyer_telegram_id,
+            title: "Escrow Payment Received",
+            message: `Payment of ₦${amount.toLocaleString()} received for ${listingTitle}. Please deliver.`,
+            type: "escrow_paid",
+            listing_id: metadata.listing_id || null,
+          });
+        }
+
+        await supabase.from("audit_logs").insert([{
+          action: "marketplace_payment_confirmed", actor: "paystack",
+          details: { tx_id: marketTxId, amount, listing: listingTitle },
+        }]);
+
+        return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+      }
 
       if (!dealId) {
         console.error("No deal_id in payment metadata");
@@ -98,9 +169,11 @@ serve(async (req) => {
           `📦 Waiting for seller to deliver and mark as delivered.\n` +
           `Once delivered, you'll be asked to confirm receipt.\n\n` +
           `⏰ Funds auto-release in 48 hours if not confirmed.`,
-          { inline_keyboard: [
-            [{ text: "📋 My Deals", callback_data: "open_mydeals" }],
-          ]}
+          {
+            inline_keyboard: [
+              [{ text: "📋 My Deals", callback_data: "open_mydeals" }],
+            ]
+          }
         );
       }
 
@@ -120,10 +193,12 @@ serve(async (req) => {
         `📦 Once delivered, tap <b>"Mark Delivered"</b> below.\n` +
         `Then the buyer will confirm receipt and you'll get paid ₦${sellerAmount.toLocaleString()}.\n\n` +
         `⏰ Auto-release in 48 hours if buyer doesn't respond.`,
-        { inline_keyboard: [
-          [{ text: `📦 Mark Delivered`, callback_data: `delivered_${dealId}` }],
-          [{ text: "📋 My Deals", callback_data: "open_mydeals" }],
-        ]}
+        {
+          inline_keyboard: [
+            [{ text: `📦 Mark Delivered`, callback_data: `delivered_${dealId}` }],
+            [{ text: "📋 My Deals", callback_data: "open_mydeals" }],
+          ]
+        }
       );
 
       console.log(`Deal ${dealId} funded. Buyer + seller notified.`);

@@ -252,11 +252,17 @@ serve(async (req) => {
 
           const sellerName = sellerUser?.username ? `@${sellerUser.username}` : (sellerUser?.first_name || `User ${listing.seller_telegram_id}`);
 
+          const amount = Number(listing.price);
+          const fee = Math.max(300, Math.round(amount * 0.05));
+          const sellerReceives = amount - fee;
+
           await sendMessage(chatId,
             `🛒 <b>Escrow Payment</b>\n${LINE}\n\n` +
             `┌─────────────────────┐\n` +
             `│ 📝 <b>${listing.title}</b>\n` +
-            `│ 💰 Price: ₦${Number(listing.price).toLocaleString()}\n` +
+            `│ 💰 Price: ₦${amount.toLocaleString()}\n` +
+            `│ 💵 Fee:   ₦${fee.toLocaleString()}\n` +
+            `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
             `│ 👤 Seller: ${sellerName}\n` +
             (listing.category ? `│ 📂 ${listing.category}\n` : "") +
             (listing.city ? `│ 📍 ${listing.city}\n` : "") +
@@ -265,7 +271,7 @@ serve(async (req) => {
             `👇 <b>Confirm to pay:</b>\n${LINE}`,
             {
               inline_keyboard: [
-                [{ text: `✅ Confirm Payment ₦${Number(listing.price).toLocaleString()}`, callback_data: `mkt_pay_${existingTx.id}` }],
+                [{ text: `✅ Confirm & Pay ₦${amount.toLocaleString()}`, callback_data: `mkt_pay_${existingTx.id}` }],
                 [{ text: "❌ Cancel", callback_data: "open_start" }],
               ]
             }
@@ -1412,56 +1418,68 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          await marketSupabase.from("transactions").update({ status: "paid" }).eq("id", txId);
+          const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+          if (!PAYSTACK_SECRET_KEY) {
+            await sendMessage(callbackChatId, `⚠️ Payment system not configured. Contact admin.`);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
 
-          // Get listing title
           let listingTitle = "Item";
           if (tx.listing_id) {
             const { data: listing } = await marketSupabase.from("listings").select("title").eq("id", tx.listing_id).maybeSingle();
             if (listing) listingTitle = listing.title;
           }
 
-
-          // Notify buyer
-          await sendMessage(callbackChatId,
-            `✅ <b>Payment Confirmed!</b>\n${LINE}\n\n` +
-            `📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n\n` +
-            `⏳ Waiting for seller to deliver. You'll be notified when they do.\n${LINE}`,
-            { inline_keyboard: [[{ text: "🔙 Menu", callback_data: "open_start" }]] }
-          );
-
-          // Notify seller via Telegram
-          const { data: buyerUser } = await marketSupabase.from("bot_users").select("username, first_name")
-            .eq("telegram_id", tx.buyer_telegram_id).maybeSingle();
-          const buyerName = buyerUser?.username ? `@${buyerUser.username}` : (buyerUser?.first_name || "Buyer");
-
-          // Send to seller chat
-          await sendMessage(tx.seller_telegram_id,
-            `💰 <b>Payment Received!</b>\n${LINE}\n\n` +
-            `📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n👤 Buyer: ${buyerName}\n\n` +
-            `Please deliver the item and wait for buyer confirmation.\n${LINE}`,
-            {
-              inline_keyboard: [
-                [{ text: "📦 Mark Delivered", callback_data: `mkt_delivered_${txId}` }],
-              ]
-            }
-          );
-
-          // Insert notification
-          await marketSupabase.from("notifications").insert({
-            recipient_telegram_id: tx.seller_telegram_id,
-            sender_telegram_id: tx.buyer_telegram_id,
-            title: "Escrow Payment Received",
-            message: `${buyerName} has paid ₦${Number(tx.amount).toLocaleString()} for ${listingTitle}. Please deliver the item.`,
-            type: "escrow_paid",
-            listing_id: tx.listing_id,
+          const amount = Number(tx.amount);
+          const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount: amount * 100,
+              email: `${callbackUser}@market.trustpay.ng`,
+              reference: `MKT-${txId}-${Date.now()}`,
+              metadata: {
+                type: "market_transaction",
+                tx_id: txId,
+                buyer_telegram_id: tx.buyer_telegram_id,
+                seller_telegram_id: tx.seller_telegram_id,
+                buyer_chat_id: callbackChatId,
+                listing_title: listingTitle
+              },
+              callback_url: "https://t.me/TrustPay9jaBot",
+            }),
           });
 
+          const paystackData = await paystackRes.json();
 
-          await supabase.from("audit_logs").insert([{
-            action: "marketplace_payment", actor: `tg:${tx.buyer_telegram_id}`,
-            details: { tx_id: txId, amount: tx.amount, listing: listingTitle },
-          }]);
+          if (paystackData.status && paystackData.data?.authorization_url) {
+            const payLink = paystackData.data.authorization_url;
+            // Update transaction in market DB with payment link/ref
+            await marketSupabase.from("transactions").update({
+              payment_link: payLink,
+              payment_ref: paystackData.data.reference
+            }).eq("id", txId);
+
+            await sendMessage(callbackChatId,
+              `💳 <b>Payment Ready</b>\n${LINE}\n\n` +
+              `┌─────────────────────┐\n` +
+              `│ 📝 ${listingTitle}\n` +
+              `│ 💰 Amount: ₦${amount.toLocaleString()}\n` +
+              `│ 👤 Seller: tg:${tx.seller_telegram_id}\n` +
+              `└─────────────────────┘\n\n` +
+              `👇 <b>Tap below to pay securely via Paystack</b>\n\n🔒 Funds held in escrow until you confirm receipt.\n${LINE}`,
+              { inline_keyboard: [[{ text: `💳 Pay ₦${amount.toLocaleString()}`, url: payLink }], [{ text: "🔙 Menu", callback_data: "open_start" }]] }
+            );
+
+            await supabase.from("audit_logs").insert([{
+              action: "marketplace_payment_init", actor: `tg:${tx.buyer_telegram_id}`,
+              details: { tx_id: txId, amount: tx.amount, listing: listingTitle },
+            }]);
+          } else {
+            console.error("Paystack error:", paystackData);
+            await sendMessage(callbackChatId, `❌ <b>Payment Error</b>\n${THIN}\n\nFailed to generate payment link. Try again.`,
+              { inline_keyboard: [[{ text: "🔄 Retry", callback_data: `mkt_pay_${txId}` }]] });
+          }
 
         } catch (e) {
           console.error("Marketplace payment error:", e);
@@ -1552,9 +1570,32 @@ serve(async (req) => {
             if (listing) listingTitle = listing.title;
           }
 
+          const amount = Number(tx.amount);
+          const fee = Math.max(300, Math.round(amount * 0.05));
+          const sellerAmount = amount - fee;
+
+          // Attempt auto-payout to seller
+          const { data: sellerUser } = await marketSupabase.from("bot_users").select("username").eq("telegram_id", tx.seller_telegram_id).maybeSingle();
+          let transferSuccess = false;
+          let sellerProfile = null;
+
+          if (sellerUser?.username) {
+            const { data: profile } = await supabase.from("user_profiles").select("*").ilike("telegram_username", `@${sellerUser.username}`).maybeSingle();
+            sellerProfile = profile;
+
+            if (sellerProfile?.paystack_recipient_code) {
+              transferSuccess = await initiateTransfer(sellerAmount, sellerProfile.paystack_recipient_code, `MKT-${txId}`, `Marketplace payout for ${listingTitle}`);
+              if (transferSuccess) {
+                await supabase.from("audit_logs").insert([{
+                  deal_id: `MKT-${txId}`, action: "transfer_initiated", actor: "system",
+                  details: { amount: sellerAmount, seller: sellerUser.username, method: "auto", source: "marketplace" },
+                }]);
+              }
+            }
+          }
 
           await sendMessage(callbackChatId,
-            `🎉 <b>Transaction Complete!</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n\n` +
+            `🎉 <b>Transaction Complete!</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${amount.toLocaleString()}\n\n` +
             `Payment has been released to the seller. Thank you! 🛡️\n${LINE}`,
             mainMenuKeyboard
           );
@@ -1566,7 +1607,10 @@ serve(async (req) => {
           const buyerName = buyerUser?.username ? `@${buyerUser.username}` : (buyerUser?.first_name || "Buyer");
 
           await sendMessage(tx.seller_telegram_id,
-            `🎉 <b>Payment Released!</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${Number(tx.amount).toLocaleString()}\n👤 Buyer: ${buyerName}\n\n` +
+            `🎉 <b>Payment Released!</b>\n${LINE}\n\n📝 ${listingTitle}\n💰 ₦${amount.toLocaleString()}\n👤 Buyer: ${buyerName}\n\n` +
+            (transferSuccess
+              ? `✅ ₦${sellerAmount.toLocaleString()} has been sent to your bank account!\n`
+              : `💰 Funds (₦${sellerAmount.toLocaleString()}) are being processed by admin. Use /setbank to automate future payouts.\n`) +
             `The buyer confirmed receipt. Funds have been released! 🎊\n${LINE}`,
             mainMenuKeyboard
           );
@@ -1576,7 +1620,7 @@ serve(async (req) => {
               recipient_telegram_id: tx.seller_telegram_id,
               sender_telegram_id: tx.buyer_telegram_id,
               title: "Payment Released",
-              message: `${buyerName} confirmed receipt of ${listingTitle}. ₦${Number(tx.amount).toLocaleString()} released.`,
+              message: `${buyerName} confirmed receipt of ${listingTitle}. ₦${sellerAmount.toLocaleString()} released.`,
               type: "payment_released",
               listing_id: tx.listing_id,
             },
@@ -1589,10 +1633,9 @@ serve(async (req) => {
             },
           ]);
 
-
           await supabase.from("audit_logs").insert([{
             action: "marketplace_released", actor: `tg:${tx.buyer_telegram_id}`,
-            details: { tx_id: txId, amount: tx.amount, listing: listingTitle },
+            details: { tx_id: txId, amount, listing: listingTitle, payout: transferSuccess ? "auto" : "manual" },
           }]);
 
         } catch (e) {
