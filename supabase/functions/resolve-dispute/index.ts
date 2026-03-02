@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateTelegramWebAppData } from "../_shared/telegram-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-telegram-init-data",
 };
 
 serve(async (req) => {
@@ -13,7 +14,35 @@ serve(async (req) => {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
     const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+    const initData = req.headers.get("x-telegram-init-data");
 
+    if (!initData || !TELEGRAM_BOT_TOKEN) {
+      throw new Error("Missing authentication credentials");
+    }
+
+    // 1. Verify Telegram Identity
+    const tgUser = validateTelegramWebAppData(initData, TELEGRAM_BOT_TOKEN);
+
+    // 2. RBAC check: Must be an admin to resolve disputes
+    const { data: settings } = await supabase.from("platform_settings").select("*");
+    const settingsMap: Record<string, string> = {};
+    settings?.forEach((s: any) => { settingsMap[s.key] = s.value; });
+
+    const adminTelegramId = settingsMap["admin_telegram_id"];
+    const adminUsername = settingsMap["admin_username"]?.toLowerCase().replace(/^@/, "");
+
+    let isAuthorized = false;
+    if (adminTelegramId && String(tgUser.id) === String(adminTelegramId)) {
+      isAuthorized = true;
+    } else if (adminUsername && tgUser.username && tgUser.username.toLowerCase() === adminUsername) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      throw new Error("Unauthorized: Admin access required to resolve disputes");
+    }
+
+    // 3. Process Request
     const { deal_id, resolution } = await req.json();
     if (!deal_id || !resolution) throw new Error("Missing deal_id or resolution");
     if (!["release_to_seller", "refund_buyer"].includes(resolution)) throw new Error("Invalid resolution");
@@ -110,8 +139,8 @@ serve(async (req) => {
     }]);
 
     return new Response(JSON.stringify({ ok: true, result: actionResult }), { headers: corsHeaders });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Resolve dispute error:", error);
-    return new Response(JSON.stringify({ error: String(error) }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: String(error) }), { status: 401, headers: corsHeaders });
   }
 });

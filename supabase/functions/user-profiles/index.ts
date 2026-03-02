@@ -104,7 +104,7 @@ serve(async (req) => {
       const { error: updateError } = await supabaseClient
         .from("user_profiles")
         .update(updateData)
-        .eq("telegram_username", userTelegramTag);
+        .eq("telegram_id", tgUser.id);
 
       if (updateError) {
         const { error: insertError } = await supabaseClient
@@ -118,11 +118,25 @@ serve(async (req) => {
         status: 200,
       });
 
+    } else if (action === "get_profile") {
+      const { data, error } = await supabaseClient
+        .from("user_profiles")
+        .select("*")
+        .eq("telegram_id", tgUser.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ success: true, profile: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+
     } else {
       throw new Error(`Unknown action: ${action}`);
     }
 
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

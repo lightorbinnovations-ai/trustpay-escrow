@@ -146,6 +146,38 @@ serve(async (req) => {
         break;
       }
 
+      case "get_user_deals": {
+        const { limit = 50, active_only = false } = payload || {};
+        let query = supabaseClient
+          .from("deals")
+          .select("*")
+          .or(`buyer_telegram.ilike.${userTelegramTag},seller_telegram.ilike.${userTelegramTag}`)
+          .order("created_at", { ascending: false });
+
+        if (active_only) {
+          query = query.not("status", "in", '("completed","refunded")');
+        }
+
+        const { data, error } = await query.limit(limit);
+        if (error) throw error;
+        result = { success: true, deals: data };
+        break;
+      }
+
+      case "get_notifications": {
+        const { limit = 30 } = payload || {};
+        const { data, error } = await supabaseClient
+          .from("audit_logs")
+          .select("*")
+          .or(`actor.ilike.${userTelegramTag},details->>seller.ilike.${userTelegramTag},details->>buyer.ilike.${userTelegramTag}`)
+          .order("created_at", { ascending: false })
+          .limit(limit);
+
+        if (error) throw error;
+        result = { success: true, notifications: data };
+        break;
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -154,7 +186,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 400,

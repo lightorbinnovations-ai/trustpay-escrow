@@ -89,7 +89,8 @@ export default function MiniAppPage() {
   const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const [activeListingId, setActiveListingId] = useState<string | null>(null);
-  const [marketAds, setMarketAds] = useState<{ id: string; title: string; description: string | null; image_path: string | null; link_url: string | null }[]>([]);
+  const [marketAds, setMarketAds] = useState<{ id: string; title: string; description: string | null; image_path: string | null; video_path: string | null; link_url: string | null; image_paths?: string[] | null }[]>([]);
+  const [activeAdImageIdx, setActiveAdImageIdx] = useState(0);
 
   const webApp = window.Telegram?.WebApp;
   const isDark = webApp?.colorScheme === "dark" || document.documentElement.classList.contains("dark");
@@ -200,48 +201,82 @@ export default function MiniAppPage() {
   const fetchDeals = useCallback(async () => {
     if (!tgUser) return;
     setLoading(true);
-    const uname = `@${tgUser.username}`;
-    const { data } = await supabase.from("deals").select("*")
-      .or(`buyer_telegram.ilike.${uname},seller_telegram.ilike.${uname}`)
-      .order("created_at", { ascending: false }).limit(50);
-    setDeals((data as Deal[]) || []);
-    setLoading(false);
-  }, [tgUser]);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) throw new Error("Missing auth");
+
+      const { data, error } = await supabase.functions.invoke('escrow-actions', {
+        body: { action: 'get_user_deals', payload: { limit: 50 } },
+        headers: { 'x-telegram-init-data': initData }
+      });
+
+      if (error) throw error;
+      setDeals((data?.deals as Deal[]) || []);
+    } catch (err) {
+      console.error("fetchDeals error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [tgUser, webApp]);
 
   const fetchHomeDeals = useCallback(async () => {
     if (!tgUser) return;
-    const uname = `@${tgUser.username}`;
-    const { data } = await supabase.from("deals").select("*")
-      .or(`buyer_telegram.ilike.${uname},seller_telegram.ilike.${uname}`)
-      .not("status", "in", '("completed","refunded")')
-      .order("created_at", { ascending: false }).limit(20);
-    setHomeDeals((data as Deal[]) || []);
-  }, [tgUser]);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) return;
+
+      const { data } = await supabase.functions.invoke('escrow-actions', {
+        body: { action: 'get_user_deals', payload: { limit: 20, active_only: true } },
+        headers: { 'x-telegram-init-data': initData }
+      });
+      setHomeDeals((data?.deals as Deal[]) || []);
+    } catch (err) {
+      console.error("fetchHomeDeals error:", err);
+    }
+  }, [tgUser, webApp]);
 
   const fetchAllUserDeals = useCallback(async () => {
     if (!tgUser) return;
-    const uname = `@${tgUser.username}`;
-    const { data } = await supabase.from("deals").select("*")
-      .or(`buyer_telegram.ilike.${uname},seller_telegram.ilike.${uname}`)
-      .order("created_at", { ascending: false });
-    setAllUserDeals((data as Deal[]) || []);
-  }, [tgUser]);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) return;
+
+      const { data } = await supabase.functions.invoke('escrow-actions', {
+        body: { action: 'get_user_deals', payload: { limit: 200 } },
+        headers: { 'x-telegram-init-data': initData }
+      });
+      setAllUserDeals((data?.deals as Deal[]) || []);
+    } catch (err) {
+      console.error("fetchAllUserDeals error:", err);
+    }
+  }, [tgUser, webApp]);
 
   const fetchProfile = useCallback(async () => {
     if (!tgUser) return;
     setProfileLoading(true);
-    const { data } = await supabase.from("user_profiles")
-      .select("*")
-      .or(`telegram_id.eq.${tgUser.id},telegram_username.ilike.@${tgUser.username}`)
-      .maybeSingle();
-    if (data) {
-      setProfile(data as UserProfile);
-      setBankName(data.bank_name || "");
-      setAccountNumber(data.account_number || "");
-      setAccountName(data.account_name || "");
+    try {
+      const initData = webApp?.initData;
+      if (!initData) return;
+
+      const { data, error } = await supabase.functions.invoke('user-profiles', {
+        body: { action: 'get_profile' },
+        headers: { 'x-telegram-init-data': initData }
+      });
+
+      if (error) throw error;
+      const profileData = data?.profile;
+      if (profileData) {
+        setProfile(profileData as UserProfile);
+        setBankName(profileData.bank_name || "");
+        setAccountNumber(profileData.account_number || "");
+        setAccountName(profileData.account_name || "");
+      }
+    } catch (err) {
+      console.error("fetchProfile error:", err);
+    } finally {
+      setProfileLoading(false);
     }
-    setProfileLoading(false);
-  }, [tgUser]);
+  }, [tgUser, webApp]);
 
   const fetchUserRatings = useCallback(async () => {
     if (!tgUser) return;
@@ -255,25 +290,34 @@ export default function MiniAppPage() {
   useEffect(() => { if (view === "my-deals") fetchDeals(); }, [view, fetchDeals]);
   useEffect(() => { if (view === "home" && tgUser) { fetchHomeDeals(); fetchAllUserDeals(); fetchUserRatings(); } }, [view, tgUser, fetchHomeDeals, fetchAllUserDeals, fetchUserRatings]);
 
-  // Fetch notifications from audit_logs relevant to this user
   const fetchNotifications = useCallback(async () => {
     if (!tgUser) return;
     setNotifLoading(true);
-    const uname = `@${tgUser.username}`;
-    const { data } = await supabase.from("audit_logs").select("*")
-      .or(`actor.ilike.${uname},details->>seller.ilike.${uname},details->>buyer.ilike.${uname}`)
-      .order("created_at", { ascending: false }).limit(30);
-    const readIds: string[] = JSON.parse(localStorage.getItem(`tp9ja_read_notifs_${tgUser.id}`) || "[]");
-    const mapped = (data || []).map(log => ({
-      id: log.id,
-      message: formatNotifMessage(log.action, log.details as Record<string, unknown> | null, log.deal_id),
-      time: log.created_at,
-      type: log.action,
-      isRead: readIds.includes(log.id),
-    }));
-    setNotifications(mapped);
-    setNotifLoading(false);
-  }, [tgUser]);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) return;
+
+      const { data, error } = await supabase.functions.invoke('escrow-actions', {
+        body: { action: 'get_notifications', payload: { limit: 30 } },
+        headers: { 'x-telegram-init-data': initData }
+      });
+
+      if (error) throw error;
+      const readIds: string[] = JSON.parse(localStorage.getItem(`tp9ja_read_notifs_${tgUser.id}`) || "[]");
+      const mapped = (data?.notifications || []).map((log: any) => ({
+        id: log.id,
+        message: formatNotifMessage(log.action, log.details as Record<string, unknown> | null, log.deal_id),
+        time: log.created_at,
+        type: log.action,
+        isRead: readIds.includes(log.id),
+      }));
+      setNotifications(mapped);
+    } catch (err) {
+      console.error("fetchNotifications error:", err);
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [tgUser, webApp]);
 
   function formatNotifMessage(action: string, details: Record<string, unknown> | null, dealId: string | null): string {
     const id = dealId || "";
@@ -304,13 +348,12 @@ export default function MiniAppPage() {
     }
   }, [tgUser]);
 
-  // Fetch Market ads to display in Escrow app
   const fetchMarketAds = async () => {
     try {
       const now = new Date().toISOString();
       const { data } = await marketSupabase
         .from("ads")
-        .select("id, title, description, image_path, link_url, stars_paid")
+        .select("id, title, description, image_path, video_path, link_url, stars_paid, image_paths")
         .eq("status", "active")
         .gte("expires_at", now)
         .limit(20);
@@ -324,6 +367,18 @@ export default function MiniAppPage() {
       // Silently fail — ads are non-critical
     }
   };
+
+  // Carousel timer for ads with multiple images
+  useEffect(() => {
+    const ad = marketAds[0];
+    const images = ad?.image_paths || (ad?.image_path ? [ad.image_path] : []);
+    if (images.length > 1) {
+      const timer = setInterval(() => {
+        setActiveAdImageIdx((prev) => (prev + 1) % images.length);
+      }, 4000);
+      return () => clearInterval(timer);
+    }
+  }, [marketAds]);
 
   // Fetch notifications on mount
   useEffect(() => { if (tgUser) { fetchNotifications(); fetchMarketAds(); } }, [tgUser, fetchNotifications]);
@@ -1221,27 +1276,12 @@ export default function MiniAppPage() {
           {/* Market Sponsored Ad */}
           {marketAds.length > 0 && (() => {
             const ad = marketAds[0];
-            return (
-              <div className="px-4 mb-3">
-                <StaggerItem index={6}>
-                  <div
-                    className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm press-effect cursor-pointer`}
-                    onClick={() => ad.link_url ? window.open(ad.link_url, "_blank") : null}
-                  >
-                    {ad.image_path && (
-                      <img src={ad.image_path} alt={ad.title} className="w-full h-32 object-cover" loading="lazy" />
-                    )}
-                    <div className="p-3 flex items-start gap-3">
-                      <div className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-600"}`}>Ad</div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-[13px] truncate">{ad.title}</p>
-                        {ad.description && <p className={`text-[11px] mt-0.5 ${textSecondary} line-clamp-2`}>{ad.description}</p>}
-                      </div>
-                    </div>
-                  </div>
-                </StaggerItem>
-              </div>
-            );
+            const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
+            const displayImage = images[activeAdImageIdx % images.length];
+
+            // Analytics Tracking Hooks (within component)
+            // We use a simple ref-based check to track impression once
+            return <AdSection ad={ad} displayImage={displayImage} isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} textSecondary={textSecondary} />;
           })()}
 
           {/* How it works mini */}
@@ -2118,4 +2158,51 @@ export default function MiniAppPage() {
   }
 
   return null;
+}
+function AdSection({ ad, displayImage, isDark, cardBg, cardBorder, textSecondary }: any) {
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    if (!tracked.current) {
+      tracked.current = true;
+      const initData = window.Telegram?.WebApp?.initData;
+      marketSupabase.functions.invoke('market-actions', {
+        body: { action: 'track_ad_view', payload: { id: ad.id } },
+        headers: initData ? { 'x-telegram-init-data': initData } : {}
+      }).catch(() => { });
+    }
+  }, [ad.id]);
+
+  const onAdClick = () => {
+    const initData = window.Telegram?.WebApp?.initData;
+    marketSupabase.functions.invoke('market-actions', {
+      body: { action: 'track_ad_click', payload: { id: ad.id } },
+      headers: initData ? { 'x-telegram-init-data': initData } : {}
+    }).catch(() => { });
+    if (ad.link_url) window.open(ad.link_url, "_blank");
+  };
+
+  return (
+    <div className="px-4 mb-3">
+      <StaggerItem index={6}>
+        <div
+          className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm press-effect cursor-pointer`}
+          onClick={onAdClick}
+        >
+          {displayImage ? (
+            <img src={displayImage} alt={ad.title} className="w-full h-32 object-cover" loading="lazy" />
+          ) : ad.video_path ? (
+            <video src={ad.video_path} className="w-full h-32 object-cover" muted autoPlay loop playsInline />
+          ) : null}
+          <div className="p-3 flex items-start gap-3">
+            <div className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-600"}`}>Ad</div>
+            <div className="min-w-0">
+              <p className="font-semibold text-[13px] truncate">{ad.title}</p>
+              {ad.description && <p className={`text-[11px] mt-0.5 ${textSecondary} line-clamp-2`}>{ad.description}</p>}
+            </div>
+          </div>
+        </div>
+      </StaggerItem>
+    </div>
+  );
 }
