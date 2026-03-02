@@ -178,6 +178,30 @@ serve(async (req) => {
         break;
       }
 
+      case "get_deal": {
+        const { deal_id } = payload;
+        const { data: deal, error } = await supabaseClient
+          .from("deals")
+          .select("*")
+          .eq("deal_id", deal_id)
+          .or(`buyer_telegram.ilike.${userTelegramTag},seller_telegram.ilike.${userTelegramTag}`)
+          .single();
+        if (error) throw error;
+        result = { success: true, deal };
+        break;
+      }
+
+      case "log_audit": {
+        const { audit_action, details } = payload;
+        await supabaseClient.from("audit_logs").insert([{
+          action: audit_action,
+          actor: userTelegramTag,
+          details: details || {},
+        }]);
+        result = { success: true };
+        break;
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }

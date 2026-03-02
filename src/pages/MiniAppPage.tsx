@@ -340,11 +340,13 @@ export default function MiniAppPage() {
     const welcomed = localStorage.getItem(`tp9ja_welcomed_${tgUser.id}`);
     if (!welcomed) {
       localStorage.setItem(`tp9ja_welcomed_${tgUser.id}`, "true");
-      supabase.from("audit_logs").insert({
-        action: "welcome",
-        actor: `@${tgUser.username}`,
-        details: { message: "New user joined TrustPay9ja" },
-      }).then(() => { });
+      const initData = webApp?.initData;
+      if (initData) {
+        supabase.functions.invoke('escrow-actions', {
+          body: { action: 'log_audit', payload: { audit_action: 'welcome', details: { message: 'New user joined TrustPay9ja' } } },
+          headers: { 'x-telegram-init-data': initData }
+        }).catch(() => { });
+      }
     }
   }, [tgUser]);
 
@@ -387,10 +389,20 @@ export default function MiniAppPage() {
   useEffect(() => { if (view === "raise-dispute" && tgUser) fetchDeals(); }, [view, tgUser, fetchDeals]);
 
   const refreshAfterAction = useCallback(async (dealId: string) => {
-    const { data } = await supabase.from("deals").select("*").eq("deal_id", dealId).single();
-    if (data) setSelectedDeal(data as Deal);
+    try {
+      const initData = webApp?.initData;
+      if (initData) {
+        const { data } = await supabase.functions.invoke('escrow-actions', {
+          body: { action: 'get_deal', payload: { deal_id: dealId } },
+          headers: { 'x-telegram-init-data': initData }
+        });
+        if (data?.deal) setSelectedDeal(data.deal as Deal);
+      }
+    } catch (err) {
+      console.error("refreshAfterAction error:", err);
+    }
     await fetchDeals();
-  }, [fetchDeals]);
+  }, [fetchDeals, webApp]);
 
   const handleSaveProfile = async () => {
     if (!tgUser) return;
