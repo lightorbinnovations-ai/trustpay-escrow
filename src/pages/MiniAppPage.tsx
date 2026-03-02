@@ -509,7 +509,23 @@ function StaggerItem({ children, index }: { children: React.ReactNode; index: nu
 }
 
 export default function MiniAppPage() {
-  const [view, setView] = useState<View>("home");
+  const [view, setViewOriginal] = useState<View>(() => {
+    const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
+    if (startParam?.startsWith("escrow_")) {
+      return "new-deal";
+    }
+    return "home";
+  });
+
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+
+  // Instrumented setView
+  const setView = (v: View) => {
+    console.log("setView called with:", v);
+    setViewOriginal(v);
+  };
+
+  console.log("CURRENT VIEW STATE:", view);
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -598,17 +614,19 @@ export default function MiniAppPage() {
 
   // Handle deep link (start_param) precisely
   useEffect(() => {
-    if (webApp && tgUser) {
-      const startParam = (webApp.initDataUnsafe as any).start_param;
-      if (startParam && startParam.startsWith('escrow_')) {
-        const listingId = startParam.replace('escrow_', '');
-        // Only fetch if we haven't already pre-populated for this listing or if we're not already on a path
-        if (activeListingId !== listingId) {
-          fetchMarketListing(listingId);
-        }
-      }
+    if (!webApp || deepLinkHandled) return;
+    const startParam = (webApp.initDataUnsafe as any).start_param;
+    if (startParam && startParam.startsWith('escrow_')) {
+      const listingId = startParam.replace('escrow_', '');
+      console.log("Deep link detected:", listingId);
+      setDeepLinkHandled(true);
+      fetchMarketListing(listingId).then(() => {
+        console.log("Navigating to new-deal");
+        setDirection("forward");
+        setView("new-deal");
+      });
     }
-  }, [tgUser, webApp]);
+  }, [tgUser, webApp, deepLinkHandled]);
 
   const fetchMarketListing = async (listingId: string) => {
     setLoading(true);
@@ -1312,11 +1330,11 @@ export default function MiniAppPage() {
   // Bottom Navigation Bar — styled like TrustPay Markets
   const BottomNav = () => {
     const navTabs = [
-      { id: "home" as View, label: "Home", icon: Home },
-      { id: "my-deals" as View, label: "Deals", icon: List },
-      { id: "new-deal" as View, label: "New", icon: Plus, isCenter: true },
-      { id: "history" as View, label: "History", icon: HistoryIcon },
-      { id: "settings" as View, label: "Profile", icon: User },
+      { id: "home" as View, label: t.home.nav_home || "Home", icon: Home },
+      { id: "my-deals" as View, label: t.deals.tab_all || "Deals", icon: List },
+      { id: "new-deal" as View, label: t.home.create_btn || "New", icon: Plus, isCenter: true },
+      { id: "history" as View, label: t.history.header || "History", icon: HistoryIcon },
+      { id: "settings" as View, label: t.sidebar.settings || "Profile", icon: User },
     ];
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-[env(safe-area-inset-bottom)] pointer-events-none">
@@ -1529,8 +1547,8 @@ export default function MiniAppPage() {
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 text-left">
-                <p className={`font-semibold text-[14px] ${isDark ? "text-[hsl(224,71%,65%)]" : "text-[hsl(224,71%,45%)]"}`}>Admin Panel</p>
-                <p className={`text-[11px] ${isDark ? "text-[hsl(224,71%,55%)]" : "text-[hsl(224,71%,55%)]"}`}>Manage marketplace</p>
+                <p className={`font-semibold text-[14px] ${isDark ? "text-[hsl(224,71%,65%)]" : "text-[hsl(224,71%,45%)]"}`}>{language === 'fr' ? "Panneau Admin" : "Admin Panel"}</p>
+                <p className={`text-[11px] ${isDark ? "text-[hsl(224,71%,55%)]" : "text-[hsl(224,71%,55%)]"}`}>{language === 'fr' ? "Gérer le marché" : "Manage marketplace"}</p>
               </div>
               <ChevronRight className={`w-4 h-4 ${isDark ? "text-[hsl(224,71%,55%)]" : "text-[hsl(224,71%,50%)]"}`} />
             </button>
@@ -1713,8 +1731,8 @@ export default function MiniAppPage() {
     const statCards = [
       { label: t.home.buys, value: completedBuys, icon: <ShoppingCart className="w-4 h-4" />, color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
       { label: t.home.sells, value: completedSells, icon: <Store className="w-4 h-4" />, color: "from-emerald-500 to-emerald-600" },
-      { label: "Spent", value: `₦${totalSpent.toLocaleString()}`, icon: <ArrowUpRight className="w-4 h-4" />, color: "from-red-400 to-red-500" },
-      { label: "Earned", value: `₦${totalEarned.toLocaleString()}`, icon: <ArrowDownLeft className="w-4 h-4" />, color: "from-emerald-400 to-teal-500" },
+      { label: language === 'fr' ? "Dépensé" : "Spent", value: `₦${totalSpent.toLocaleString()}`, icon: <ArrowUpRight className="w-4 h-4" />, color: "from-red-400 to-red-500" },
+      { label: language === 'fr' ? "Gagné" : "Earned", value: `₦${totalEarned.toLocaleString()}`, icon: <ArrowDownLeft className="w-4 h-4" />, color: "from-emerald-400 to-teal-500" },
       { label: t.home.total_transactions, value: allUserDeals.length, icon: <Package className="w-4 h-4" />, color: "from-blue-500 to-blue-600" },
       { label: t.home.active_deals, value: homeDeals.length, icon: <Clock className="w-4 h-4" />, color: "from-amber-500 to-amber-600" }
     ];
