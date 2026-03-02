@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { marketSupabase } from "@/integrations/supabase/market-client";
-import { Shield, Plus, List, AlertTriangle, CheckCircle, Clock, Loader2, ArrowLeft, Send, ChevronRight, Sparkles, Package, Bell, ShoppingCart, Store, TrendingUp, Wallet, ArrowDownLeft, ArrowUpRight, Settings, CreditCard, User, Menu, X, Home, FileText, Phone, HelpCircle, History, Star, MessageCircle, Mail, Upload, Camera, Zap, Search } from "lucide-react";
+import { Globe, Shield, Plus, List, AlertTriangle, CheckCircle, Clock, Loader2, ArrowLeft, Send, ChevronRight, Sparkles, Package, Bell, ShoppingCart, Store, TrendingUp, Wallet, ArrowDownLeft, ArrowUpRight, Settings, CreditCard, User, Menu, X, Home, FileText, Phone, HelpCircle, History, Star, MessageCircle, Mail, Upload, Camera, Zap, Search } from "lucide-react";
 
 declare global {
   interface Window {
@@ -38,6 +38,387 @@ type Rating = { id: string; deal_id: string; rater_telegram: string; rated_teleg
 function usernameMatch(a: string, b: string): boolean {
   return a.toLowerCase().replace(/^@/, "") === b.toLowerCase().replace(/^@/, "");
 }
+
+const translations = {
+  en: {
+    common: {
+      loading: "Loading TrustPay9ja...",
+      error: "Error",
+      success: "Success",
+      back: "Back",
+      save: "Save",
+      submit: "Submit",
+      cancel: "Cancel",
+      search: "Search deals or users",
+      confirm: "Confirm",
+      view_details: "View Details",
+      amount: "Amount",
+      description: "Description",
+      status: "Status",
+      date: "Date"
+    },
+    home: {
+      greeting: "Hi",
+      what_need: "What do you need today?",
+      stats: "Recent Stats",
+      buys: "Deals as Buyer",
+      sells: "Deals as Seller",
+      active_deals: "Active Transactions",
+      view_all: "View All",
+      no_deals: "No active deals",
+      create_btn: "New Deal",
+      pending_attention: "deals need your attention",
+      pending_attention_single: "deal needs your attention",
+      active_overview: "Active Overview",
+      how_it_works: "How it works",
+      learn_more: "Learn more",
+      active_as_buyer: "Active as buyer",
+      active_as_seller: "Active as seller",
+      disputes: "Disputes",
+      total_transactions: "Total transactions"
+    },
+    deals: {
+      header: "My Deals",
+      tab_all: "All",
+      tab_buying: "Buying",
+      tab_selling: "Selling",
+      no_deals: "No deals yet",
+      create_first: "Create your first secure transaction",
+      buying_label: "You're buying",
+      selling_label: "You're selling",
+      delivered: "Delivered",
+      needs_action: "Needs action",
+      loading_deals: "Loading deals..."
+    },
+    details: {
+      header: "Deal Details",
+      participants: {
+        buyer: "You're the buyer",
+        seller: "You're the seller",
+        participant: "Participant"
+      },
+      fee_info: "Fee: ₦{fee} · Seller gets: ₦{payout}",
+      progress: {
+        header: "Progress",
+        created: "Created",
+        accepted: "Accepted",
+        paid: "Paid",
+        delivered: "Delivered",
+        confirmed: "Confirmed",
+        done: "Done"
+      },
+      fields: {
+        description: "Description",
+        buyer: "Buyer",
+        seller: "Seller",
+        created: "Created"
+      },
+      actions: {
+        accept: "Accept Deal",
+        decline: "Decline Deal",
+        accept_hint: "Accept to let the buyer proceed with payment",
+        waiting_seller: "Waiting for seller to accept. You'll be notified once they accept.",
+        pay_btn: "Pay ₦{amount}",
+        pay_hint: "Seller has accepted! Tap to pay securely.",
+        pay_telegram_hint: "Seller accepted! Use the Telegram chat to tap \"Pay\" to generate your payment link.",
+        waiting_payment: "You accepted! Waiting for buyer to pay.",
+        mark_delivered: "Mark as Delivered",
+        delivered_hint: "Tap once you've delivered to the buyer",
+        waiting_confirmation: "Delivered! Waiting for buyer to confirm. Payout will be sent to your bank.",
+        confirm_received: "Confirm Received — Release Funds",
+        open_dispute: "Open Dispute",
+        seller_marked: "Seller has marked this as delivered!",
+        payment_confirmed: "Payment confirmed! Waiting for seller to deliver.",
+        refund_status: "Refund Status",
+        deal_complete: "Deal complete!",
+        payout_released: "₦{amount} released to you.",
+        funds_released: "Funds released to seller.",
+        rate_deal: "Rate This Deal",
+        under_dispute: "Under dispute. Admin will review and resolve. Funds are safely held."
+      }
+    },
+    new_deal: {
+      header: "New Deal",
+      buyer_hint: "You're the buyer — enter the seller's details",
+      created: "Deal Created!",
+      waiting: "Waiting for seller to accept.",
+      form: {
+        seller: "Seller Username",
+        amount: "Amount (₦)",
+        description: "Description",
+        placeholder_user: "@username",
+        placeholder_amount: "100 – 20,000",
+        placeholder_desc: "What are you buying?",
+        fee_label: "Platform fee (5%)",
+        seller_receives: "Seller receives"
+      }
+    },
+    dispute: {
+      header: "Raise Dispute",
+      submitted: "Dispute Submitted!",
+      desc: "Our team will review your dispute within 24 hours. You'll be notified of the resolution via Telegram.",
+      view_deals: "View My Deals",
+      report_issue: "Report an Issue",
+      how_it_works: "If you've been scammed, didn't receive your item, or there's a problem with a deal, file a dispute here.",
+      select_deal: "Select Deal",
+      choose_deal: "Choose a deal...",
+      no_funded_deals: "No active funded deals to dispute. Only funded deals can be disputed.",
+      describe_issue: "Describe the Issue",
+      placeholder_issue: "Explain what went wrong in detail...",
+      upload_evidence: "Upload Evidence (Optional)",
+      tap_upload: "Tap to upload screenshot",
+      submit_btn: "Submit Dispute",
+      active_header: "Active Disputes"
+    },
+    settings: {
+      header: "Settings",
+      profile: {
+        total_deals: "Total deals",
+        completed: "Completed"
+      },
+      bank: {
+        header: "Bank Account",
+        bank_name: "Bank Name",
+        select_bank: "Select bank...",
+        account_number: "Account Number",
+        account_name: "Account Name",
+        save_btn: "Save Bank Details"
+      },
+      language: "Language",
+      notifications: {
+        header: "Notifications",
+        desc: "Manage alert preferences",
+        transactions: "Transaction Updates",
+        disputes: "Dispute Alerts",
+        promotions: "Promotions & Tips"
+      }
+    },
+    contact: {
+      header: "Contact Support",
+      support_hours: "Support hours: Mon—Sat, 9 AM — 6 PM WAT",
+      response_time: "Average response time: Under 1 hour",
+      need_help: "Need immediate help? Reach us through any of these channels:"
+    },
+    faq: {
+      header: "How It Works",
+      flow: "Transaction Flow",
+      steps: [
+        { title: "Create Deal", desc: "Buyer enters seller username, amount & description" },
+        { title: "Seller Accepts", desc: "Seller reviews and accepts the deal terms" },
+        { title: "Buyer Pays", desc: "Buyer pays securely — funds held in escrow" },
+        { title: "Seller Delivers", desc: "Seller delivers product/service and marks it" },
+        { title: "Buyer Confirms", desc: "Buyer confirms receipt → funds released!" }
+      ],
+      faq_header: "Frequently Asked Questions"
+    },
+    history: {
+      header: "Transaction History",
+      count_label: "completed transactions",
+      single_count_label: "completed transaction",
+      no_history: "No history yet",
+      history_desc: "Completed deals will appear here",
+      bought: "Bought",
+      sold: "Sold"
+    },
+    rating: {
+      header: "Rate Your Experience",
+      desc: "How was this transaction?",
+      placeholder: "Leave a comment (optional)",
+      submit: "Submit Rating",
+      skip: "Skip"
+    }
+  },
+  fr: {
+    common: {
+      loading: "Chargement de TrustPay9ja...",
+      error: "Erreur",
+      success: "Succès",
+      back: "Retour",
+      save: "Enregistrer",
+      submit: "Envoyer",
+      cancel: "Annuler",
+      search: "Rechercher des transactions",
+      confirm: "Confirmer",
+      view_details: "Voir les détails",
+      amount: "Montant",
+      description: "Description",
+      status: "Statut",
+      date: "Date"
+    },
+    home: {
+      greeting: "Salut",
+      what_need: "De quoi avez-vous besoin ?",
+      stats: "Stats Récentes",
+      buys: "Achats",
+      sells: "Ventes",
+      active_deals: "Transactions Actives",
+      view_all: "Voir Tout",
+      no_deals: "Aucune transaction",
+      create_btn: "Nouveau Deal",
+      pending_attention: "nécessitent votre attention",
+      pending_attention_single: "nécessite votre attention",
+      active_overview: "Aperçu Actif",
+      how_it_works: "Comment ça marche",
+      learn_more: "En savoir plus",
+      active_as_buyer: "Actif comme acheteur",
+      active_as_seller: "Actif comme vendeur",
+      disputes: "Litiges",
+      total_transactions: "Total transactions"
+    },
+    deals: {
+      header: "Mes Deals",
+      tab_all: "Tout",
+      tab_buying: "Achats",
+      tab_selling: "Ventes",
+      no_deals: "Aucun deal pour le moment",
+      create_first: "Créez votre première transaction sécurisée",
+      buying_label: "Vous achetez",
+      selling_label: "Vous vendez",
+      delivered: "Livré",
+      needs_action: "Action requise",
+      loading_deals: "Chargement des deals..."
+    },
+    details: {
+      header: "Détails du Deal",
+      participants: {
+        buyer: "Vous êtes l'acheteur",
+        seller: "Vous êtes le vendeur",
+        participant: "Participant"
+      },
+      fee_info: "Frais: ₦{fee} · Vendeur reçoit: ₦{payout}",
+      progress: {
+        header: "Progression",
+        created: "Créé",
+        accepted: "Accepté",
+        paid: "Payé",
+        delivered: "Livré",
+        confirmed: "Confirmé",
+        done: "Terminé"
+      },
+      fields: {
+        description: "Description",
+        buyer: "Acheteur",
+        seller: "Vendeur",
+        created: "Créé le"
+      },
+      actions: {
+        accept: "Accepter le Deal",
+        decline: "Refuser le Deal",
+        accept_hint: "Accepter pour permettre à l'acheteur de payer",
+        waiting_seller: "En attente de l'acceptation du vendeur.",
+        pay_btn: "Payer ₦{amount}",
+        pay_hint: "Vendeur a accepté ! Payez en toute sécurité.",
+        pay_telegram_hint: "Vendeur a accepté ! Utilisez Telegram pour générer le lien de paiement.",
+        waiting_payment: "Accepté ! En attente du paiement de l'acheteur.",
+        mark_delivered: "Marquer comme Livré",
+        delivered_hint: "Appuyez une fois livré à l'acheteur",
+        waiting_confirmation: "Livré ! En attente de confirmation de l'acheteur.",
+        confirm_received: "Confirmer la Réception — Libérer les Fonds",
+        open_dispute: "Ouvrir un Litige",
+        seller_marked: "Le vendeur a marqué comme livré !",
+        payment_confirmed: "Paiement confirmé ! En attente de livraison.",
+        refund_status: "Statut du Remboursement",
+        deal_complete: "Deal terminé !",
+        payout_released: "₦{amount} vous ont été versés.",
+        funds_released: "Fonds libérés pour le vendeur.",
+        rate_deal: "Évaluer ce Deal",
+        under_dispute: "En litige. Un admin va examiner. Fonds sécurisés."
+      }
+    },
+    new_deal: {
+      header: "Nouveau Deal",
+      buyer_hint: "Vous êtes l'acheteur — entrez les détails du vendeur",
+      created: "Deal Créé !",
+      waiting: "En attente de l'acceptation du vendeur.",
+      form: {
+        seller: "Nom d'utilisateur du vendeur",
+        amount: "Montant (₦)",
+        description: "Description",
+        placeholder_user: "@username",
+        placeholder_amount: "100 – 20 000",
+        placeholder_desc: "Qu'achetez-vous ?",
+        fee_label: "Frais de plateforme (5%)",
+        seller_receives: "Le vendeur reçoit"
+      }
+    },
+    dispute: {
+      header: "Ouvrir un Litige",
+      submitted: "Litige Envoyé !",
+      desc: "Notre équipe examinera sous 24h. Notification par Telegram.",
+      view_deals: "Voir mes deals",
+      report_issue: "Signaler un Problème",
+      how_it_works: "Si vous avez été arnaqué ou s'il y a un problème, remplissez ce formulaire.",
+      select_deal: "Sélectionner le Deal",
+      choose_deal: "Choisir un deal...",
+      no_funded_deals: "Aucun deal financé disponible pour litige.",
+      describe_issue: "Décrire le Problème",
+      placeholder_issue: "Expliquez en détail ce qui ne va pas...",
+      upload_evidence: "Preuve (Optionnel)",
+      tap_upload: "Appuyez pour uploader une capture",
+      submit_btn: "Envoyer le Litige",
+      active_header: "Litiges Actifs"
+    },
+    settings: {
+      header: "Paramètres",
+      profile: {
+        total_deals: "Total des deals",
+        completed: "Terminés"
+      },
+      bank: {
+        header: "Compte Bancaire",
+        bank_name: "Nom de la Banque",
+        select_bank: "Sélectionner une banque...",
+        account_number: "Numéro de Compte",
+        account_name: "Nom du Compte",
+        save_btn: "Enregistrer les Infos"
+      },
+      language: "Langue",
+      notifications: {
+        header: "Notifications",
+        desc: "Gérer vos alertes",
+        transactions: "Mises à jour des deals",
+        disputes: "Alertes de litige",
+        promotions: "Promotions et Astuces"
+      }
+    },
+    contact: {
+      header: "Support",
+      support_hours: "Heures: Lun—Sam, 9h — 18h WAT",
+      response_time: "Réponse en moins d'une heure",
+      need_help: "Besoin d'aide ? Contactez-nous ici :"
+    },
+    faq: {
+      header: "Comment ça marche",
+      flow: "Flux de Transaction",
+      steps: [
+        { title: "Créer Deal", desc: "L'acheteur entre les détails" },
+        { title: "Vendeur Accepte", desc: "Le vendeur examine et valide" },
+        { title: "Acheteur Paye", desc: "Fonds bloqués en séquestre" },
+        { title: "Vendeur Livre", desc: "Le vendeur envoie et notifie" },
+        { title: "Acheteur Confirme", desc: "Fonds libérés au vendeur !" }
+      ],
+      faq_header: "Questions Fréquentes"
+    },
+    history: {
+      header: "Historique",
+      count_label: "transactions terminées",
+      single_count_label: "transaction terminée",
+      no_history: "Aucun historique",
+      history_desc: "Les deals terminés apparaîtront ici",
+      bought: "Acheté",
+      sold: "Vendu"
+    },
+    rating: {
+      header: "Votre Avis",
+      desc: "Comment s'est passée la transaction ?",
+      placeholder: "Laissez un commentaire (optionnel)",
+      submit: "Envoyer",
+      skip: "Passer"
+    }
+  }
+};
+
+type Language = "en" | "fr";
 
 function PageTransition({ children, direction = "forward" }: { children: React.ReactNode; direction?: "forward" | "back" }) {
   return <div className={direction === "forward" ? "animate-slide-in-page" : "animate-slide-in-back"} style={{ animationFillMode: "both" }}>{children}</div>;
@@ -91,9 +472,30 @@ export default function MiniAppPage() {
   const [activeListingId, setActiveListingId] = useState<string | null>(null);
   const [marketAds, setMarketAds] = useState<{ id: string; title: string; description: string | null; image_path: string | null; video_path: string | null; link_url: string | null; image_paths?: string[] | null }[]>([]);
   const [activeAdImageIdx, setActiveAdImageIdx] = useState(0);
+  const [language, setLanguageState] = useState<Language>((localStorage.getItem("escrow_lang") as Language) || "en");
+  const [notifSettings, setNotifSettings] = useState({
+    transactions: localStorage.getItem("escrow_notif_transactions") !== "false",
+    disputes: localStorage.getItem("escrow_notif_disputes") !== "false",
+    promotions: localStorage.getItem("escrow_notif_promotions") !== "false",
+  });
 
   const webApp = window.Telegram?.WebApp;
   const isDark = webApp?.colorScheme === "dark" || document.documentElement.classList.contains("dark");
+
+  const t = translations[language];
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem("escrow_lang", lang);
+    webApp?.HapticFeedback?.impactOccurred("light");
+  };
+
+  const toggleNotif = (key: keyof typeof notifSettings) => {
+    const newVal = !notifSettings[key];
+    setNotifSettings(prev => ({ ...prev, [key]: newVal }));
+    localStorage.setItem(`escrow_notif_${key}`, newVal.toString());
+    webApp?.HapticFeedback?.impactOccurred("light");
+  };
 
   useEffect(() => {
     if (webApp) {
@@ -953,6 +1355,16 @@ export default function MiniAppPage() {
     { id: "settings" as View, label: "Settings", subtitle: "Account preferences", icon: Settings, color: "from-gray-500 to-gray-600" },
   ];
 
+  // ===== LOADING STATE =====
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${bg} ${textPrimary} flex flex-col items-center justify-center p-6 gap-4`}>
+        <Loader2 className="w-10 h-10 animate-spin text-[hsl(224,71%,50%)]" />
+        <p className={`text-sm ${textSecondary} animate-pulse`}>Loading TrustPay9ja...</p>
+      </div>
+    );
+  }
+
   // ===== NOT IN TELEGRAM =====
   if (!tgUser) {
     return (
@@ -1145,8 +1557,8 @@ export default function MiniAppPage() {
   // ===== HOME (DASHBOARD) =====
   if (view === "home") {
     const statCards = [
-      { label: "Total Bought", value: completedBuys, icon: <ShoppingCart className="w-4 h-4" />, color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
-      { label: "Total Sold", value: completedSells, icon: <Store className="w-4 h-4" />, color: "from-emerald-500 to-emerald-600" },
+      { label: t.home.buys, value: completedBuys, icon: <ShoppingCart className="w-4 h-4" />, color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
+      { label: t.home.sells, value: completedSells, icon: <Store className="w-4 h-4" />, color: "from-emerald-500 to-emerald-600" },
       { label: "Spent", value: `₦${totalSpent.toLocaleString()}`, icon: <ArrowUpRight className="w-4 h-4" />, color: "from-red-400 to-red-500" },
       { label: "Earned", value: `₦${totalEarned.toLocaleString()}`, icon: <ArrowDownLeft className="w-4 h-4" />, color: "from-emerald-400 to-teal-500" },
     ];
@@ -1156,13 +1568,12 @@ export default function MiniAppPage() {
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
-        <RatingModal />
         <PageTransition direction={direction}>
           <Header />
           {/* Greeting */}
           <div className="pt-4 pb-2 px-5">
             <StaggerItem index={0}>
-              <h1 className="text-[22px] font-bold tracking-tight">Hi, {tgUser?.firstName} 👋</h1>
+              <h1 className="text-[22px] font-bold tracking-tight">{t.home.greeting}, {tgUser?.firstName} 👋</h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className={`text-[13px] ${textSecondary}`}>@{tgUser?.username}</span>
                 {avgRating !== "—" && (
@@ -1177,10 +1588,10 @@ export default function MiniAppPage() {
           {/* What do you need? + Search */}
           <div className="px-5 mb-4">
             <StaggerItem index={0}>
-              <p className={`text-[14px] mb-2.5 ${textSecondary}`}>What do you need today?</p>
+              <p className={`text-[14px] mb-2.5 ${textSecondary}`}>{t.home.what_need}</p>
               <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl ${isDark ? "bg-white/5 border border-white/5" : "bg-black/[0.03] border border-black/[0.04]"}`}>
                 <Search className={`w-4 h-4 ${textSecondary}`} />
-                <span className={`text-[14px] ${isDark ? "text-white/25" : "text-black/30"}`}>Search deals or users</span>
+                <span className={`text-[14px] ${isDark ? "text-white/25" : "text-black/30"}`}>{t.common.search}</span>
               </div>
             </StaggerItem>
           </div>
@@ -1195,7 +1606,7 @@ export default function MiniAppPage() {
                   </div>
                   <div className="text-left flex-1">
                     <p className={`font-semibold text-[14px] ${isDark ? "text-amber-400" : "text-amber-700"}`}>
-                      {totalPendingActions} deal{totalPendingActions > 1 ? "s" : ""} need{totalPendingActions === 1 ? "s" : ""} your attention
+                      {totalPendingActions} {totalPendingActions > 1 ? t.home.pending_attention : t.home.pending_attention_single}
                     </p>
                     <p className={`text-[12px] ${isDark ? "text-amber-400/60" : "text-amber-600/70"}`}>
                       {pendingSellerActions > 0 && `${pendingSellerActions} to accept`}
@@ -1224,105 +1635,116 @@ export default function MiniAppPage() {
                 ))}
               </div>
             </StaggerItem>
-          </div>
-
-          {/* Active Overview */}
-          <div className="px-4 mb-4">
-            <StaggerItem index={3}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
-                  <h3 className="font-semibold text-[14px]">Active Overview</h3>
-                </div>
-                <div className="space-y-2.5">
-                  {[
-                    { label: "Active as buyer", value: activeBuyDeals },
-                    { label: "Active as seller", value: activeSellDeals },
-                    { label: "Disputes", value: disputedDeals },
-                    { label: "Total transactions", value: allUserDeals.length },
-                  ].map((row, i) => (
-                    <div key={i}>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[13px] ${textSecondary}`}>{row.label}</span>
-                        <span className="text-[14px] font-semibold">{row.value}</span>
-                      </div>
-                      {i < 3 && <div className={`h-px mt-2.5 ${isDark ? "bg-white/5" : "bg-black/[0.04]"}`} />}
+            {/* Dashboard Stats */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {[
+                { label: t.home.buys, value: stats.buyer, icon: <ShoppingCart className="w-5 h-5 text-blue-500" />, bg: "bg-blue-500/10", border: "border-blue-500/20" },
+                { label: t.home.sells, value: stats.seller, icon: <Store className="w-5 h-5 text-emerald-500" />, bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+                { label: t.home.active_deals, value: deals.filter(d => ["pending", "accepted", "funded"].includes(d.status)).length, icon: <Clock className="w-5 h-5 text-amber-500" />, bg: "bg-amber-500/10", border: "border-amber-500/20" },
+                { label: t.home.disputes, value: stats.disputed, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, bg: "bg-red-500/10", border: "border-red-500/20" },
+              ].map((stat, i) => (
+                <StaggerItem key={i} index={i + 1}>
+                  <div className={`${cardBg} border ${cardBorder} p-4 rounded-2xl shadow-sm relative overflow-hidden group`}>
+                    <div className="absolute -right-2 -top-2 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                      {stat.icon}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </StaggerItem>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="px-4 space-y-2.5 mb-4">
-            <StaggerItem index={4}>
-              <button onClick={() => navigate("new-deal")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm`}>
-                <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-md shadow-[hsl(224,71%,40%)/0.2]">
-                  <Plus className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-left flex-1">
-                  <p className="font-semibold text-[15px]">New Deal</p>
-                  <p className={`text-[13px] mt-0.5 ${textSecondary}`}>Create a secure escrow transaction</p>
-                </div>
-                <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
-              </button>
-            </StaggerItem>
-            <StaggerItem index={5}>
-              <button onClick={() => navigate("my-deals")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm relative`}>
-                <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
-                  <List className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-left flex-1">
-                  <p className="font-semibold text-[15px]">My Deals</p>
-                  <p className={`text-[13px] mt-0.5 ${textSecondary}`}>View deals as buyer or seller</p>
-                </div>
-                {totalPendingActions > 0 && (
-                  <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center badge-pulse">{totalPendingActions}</span>
-                )}
-                <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
-              </button>
-            </StaggerItem>
-          </div>
-
-          {/* Market Sponsored Ad */}
-          {marketAds.length > 0 && (() => {
-            const ad = marketAds[0];
-            const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
-            const displayImage = images[activeAdImageIdx % images.length];
-
-            // Analytics Tracking Hooks (within component)
-            // We use a simple ref-based check to track impression once
-            return <AdSection ad={ad} displayImage={displayImage} isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} textSecondary={textSecondary} />;
-          })()}
-
-          {/* How it works mini */}
-          <div className="px-4 pb-8">
-            <StaggerItem index={6}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
-                  <h3 className="font-semibold text-[14px]">How it works</h3>
-                </div>
-                <div className="space-y-2.5">
-                  {[
-                    { step: "1", text: "Buyer creates deal → Seller accepts", color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
-                    { step: "2", text: "Buyer pays → Funds held in escrow", color: "from-amber-500 to-amber-600" },
-                    { step: "3", text: "Seller delivers → Buyer confirms → Payout!", color: "from-emerald-500 to-emerald-600" },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{item.step}</div>
-                      <p className={`text-[12px] leading-snug ${isDark ? "text-white/60" : "text-black/50"}`}>{item.text}</p>
+                    <div className={`w-10 h-10 rounded-xl ${stat.bg} ${stat.border} border flex items-center justify-center mb-3`}>
+                      {stat.icon}
                     </div>
-                  ))}
-                </div>
-                <button onClick={() => navigate("faq")} className={`text-[12px] font-medium mt-3 ${isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]"}`}>
-                  Learn more →
+                    <p className={`text-[11px] font-bold uppercase tracking-wider mb-0.5 ${textSecondary}`}>{stat.label}</p>
+                    <p className="text-2xl font-black tabular-nums">{stat.value}</p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </div>
+
+            {/* Pending Attention */}
+            {pendingActions.length > 0 && (
+              <StaggerItem index={5}>
+                <button onClick={() => navigate("my-deals")}
+                  className={`w-full mb-6 p-4 rounded-2xl border flex items-center gap-4 press-effect shadow-sm transition-all ${isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"
+                    }`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${isDark ? "bg-amber-500/20" : "bg-amber-500/10"}`}>
+                    <Bell className="w-6 h-6 badge-pulse" />
+                  </div>
+                  <div className="text-left flex-1 min-w-0">
+                    <p className="font-bold text-[15px] leading-tight">{pendingActions.length} {pendingActions.length === 1 ? t.home.pending_attention_single : t.home.pending_attention}</p>
+                    <p className="text-[12px] opacity-80 mt-0.5 truncate">{t.home.view_all} →</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 opacity-40" />
                 </button>
-              </div>
-            </StaggerItem>
-          </div>
-          <MiniFooter />
+              </StaggerItem>
+            )}
+
+            {/* Quick Actions */}
+            <div className="px-4 space-y-2.5 mb-4">
+              <StaggerItem index={4}>
+                <button onClick={() => navigate("new-deal")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm`}>
+                  <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-md shadow-[hsl(224,71%,40%)/0.2]">
+                    <Plus className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-semibold text-[15px]">{t.home.create_btn}</p>
+                    <p className={`text-[13px] mt-0.5 ${textSecondary}`}>Create a secure escrow transaction</p>
+                  </div>
+                  <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
+                </button>
+              </StaggerItem>
+              <StaggerItem index={5}>
+                <button onClick={() => navigate("my-deals")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm relative`}>
+                  <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                    <List className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="font-semibold text-[15px]">My Deals</p>
+                    <p className={`text-[13px] mt-0.5 ${textSecondary}`}>View deals as buyer or seller</p>
+                  </div>
+                  {totalPendingActions > 0 && (
+                    <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center badge-pulse">{totalPendingActions}</span>
+                  )}
+                  <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
+                </button>
+              </StaggerItem>
+            </div>
+
+            {/* Market Sponsored Ad */}
+            {marketAds.length > 0 && (() => {
+              const ad = marketAds[0];
+              const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
+              const displayImage = images[activeAdImageIdx % images.length];
+
+              // Analytics Tracking Hooks (within component)
+              // We use a simple ref-based check to track impression once
+              return <AdSection ad={ad} displayImage={displayImage} isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} textSecondary={textSecondary} />;
+            })()}
+
+            {/* How it works mini */}
+            <div className="px-4 pb-8">
+              <StaggerItem index={6}>
+                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
+                    <h3 className="font-semibold text-[14px]">{t.home.how_it_works}</h3>
+                  </div>
+                  <div className="space-y-2.5">
+                    {[
+                      { step: "1", text: "Buyer creates deal → Seller accepts", color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
+                      { step: "2", text: "Buyer pays → Funds held in escrow", color: "from-amber-500 to-amber-600" },
+                      { step: "3", text: "Seller delivers → Buyer confirms → Payout!", color: "from-emerald-500 to-emerald-600" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{item.step}</div>
+                        <p className={`text-[12px] leading-snug ${isDark ? "text-white/60" : "text-black/50"}`}>{item.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => navigate("faq")} className={`text-[12px] font-medium mt-3 ${isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]"}`}>
+                    {t.home.learn_more} →
+                  </button>
+                </div>
+              </StaggerItem>
+            </div>
+            <MiniFooter />
         </PageTransition>
         <BottomNav />
       </div>
@@ -1331,103 +1753,92 @@ export default function MiniAppPage() {
 
   // ===== RAISE DISPUTE =====
   if (view === "raise-dispute") {
+    const fundedDeals = deals.filter(d => (["funded", "completed"].includes(d.status)) || (d.status === "funded" && d.delivered_at));
+    const activeDisputes = deals.filter(d => d.status === "disputed");
+
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} overflow-x-hidden`}>
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="Raise Dispute" />
+          <Header title={t.dispute.header} />
           <div className="px-4 pb-8">
             {disputeSuccess ? (
               <StaggerItem index={0}>
-                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 text-center shadow-sm mt-4`}>
-                  <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-                    <AlertTriangle className="w-8 h-8 text-amber-500" />
+                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-8 text-center shadow-sm`}>
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-8 h-8 text-emerald-500" />
                   </div>
-                  <p className="text-lg font-bold">Dispute Submitted!</p>
-                  <p className={`text-sm mt-2 ${textSecondary}`}>Our team will review your dispute within 24 hours. You'll be notified of the resolution via Telegram.</p>
-                  <button onClick={() => { setDisputeSuccess(false); navigate("my-deals"); }} className="mt-4 text-[hsl(224,71%,50%)] text-[14px] font-semibold press-effect">
-                    View My Deals →
+                  <p className="text-lg font-bold">{t.dispute.submitted}</p>
+                  <p className={`text-[13px] mt-2 ${textSecondary}`}>
+                    {t.dispute.desc}
+                  </p>
+                  <button onClick={() => navigate("my-deals")} className="mt-6 text-[hsl(224,71%,50%)] text-[14px] font-semibold press-effect">
+                    {t.dispute.view_deals} →
                   </button>
                 </div>
               </StaggerItem>
             ) : (
               <StaggerItem index={0}>
-                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mt-2 space-y-4`}>
+                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm space-y-4`}>
                   <div className="flex items-center gap-2 mb-1">
                     <AlertTriangle className={`w-5 h-5 ${isDark ? "text-red-400" : "text-red-500"}`} />
-                    <h3 className="font-semibold text-[16px]">Report an Issue</h3>
+                    <h3 className="font-semibold text-[16px]">{t.dispute.report_issue}</h3>
                   </div>
-                  <p className={`text-[13px] ${textSecondary}`}>If you've been scammed, didn't receive your item, or there's a problem with a deal, file a dispute here.</p>
+                  <p className={`text-[13px] ${textSecondary}`}>{t.dispute.how_it_works}</p>
 
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Select Deal</label>
-                    <select value={disputeDealId} onChange={e => setDisputeDealId(e.target.value)}
-                      className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg} appearance-none`}>
-                      <option value="">Choose a deal...</option>
-                      {disputableDeals.map(d => (
-                        <option key={d.deal_id} value={d.deal_id}>{d.deal_id} — ₦{d.amount.toLocaleString()} ({d.description.substring(0, 30)})</option>
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.dispute.select_deal}</label>
+                    <select value={disputeDealId} onChange={(e) => setDisputeDealId(e.target.value)}
+                      className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus appearance-none ${inputBg}`}>
+                      <option value="">{t.dispute.choose_deal}</option>
+                      {fundedDeals.map(d => (
+                        <option key={d.id} value={d.id}>₦{d.amount.toLocaleString()} — {d.description || d.deal_id}</option>
                       ))}
                     </select>
-                    {disputableDeals.length === 0 && (
-                      <p className={`text-[11px] mt-1 ${textSecondary}`}>No active funded deals to dispute. Only funded deals can be disputed.</p>
-                    )}
+                    {fundedDeals.length === 0 && <p className="text-[11px] text-red-500 mt-1">{t.dispute.no_funded_deals}</p>}
                   </div>
 
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Describe the Issue</label>
-                    <textarea value={disputeReason} onChange={e => setDisputeReason(e.target.value)} placeholder="Explain what went wrong in detail..."
-                      className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg} min-h-[120px] resize-none`} maxLength={500} />
-                    <p className={`text-[11px] mt-1 ${textSecondary}`}>{disputeReason.length}/500 characters</p>
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.dispute.describe_issue}</label>
+                    <textarea value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} placeholder={t.dispute.placeholder_issue}
+                      className={`w-full p-3.5 rounded-xl text-[14px] border outline-none input-focus ${inputBg} min-h-[100px]`} />
                   </div>
 
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Upload Evidence (Optional)</label>
-                    <label className={`w-full p-4 rounded-xl border-2 border-dashed ${isDark ? "border-white/10" : "border-black/10"} flex flex-col items-center gap-2 cursor-pointer press-effect`}>
-                      <Upload className={`w-6 h-6 ${textSecondary}`} />
-                      <span className={`text-[13px] ${textSecondary}`}>{disputeFile ? disputeFile.name : "Tap to upload screenshot"}</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={e => setDisputeFile(e.target.files?.[0] || null)} />
-                    </label>
-                  </div>
-
-                  {error && (
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                      <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                      <p className="text-red-500 text-[13px] font-medium">{error}</p>
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.dispute.upload_evidence}</label>
+                    <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${cardBorder} ${isDark ? "hover:bg-white/5" : "hover:bg-black/5"}`}>
+                      <Upload className={`w-6 h-6 mx-auto mb-2 ${textSecondary}`} />
+                      <p className={`text-[13px] ${textSecondary}`}>{t.dispute.tap_upload}</p>
                     </div>
-                  )}
+                  </div>
 
-                  <button onClick={handleSubmitDispute} disabled={disputeSubmitting}
+                  <button onClick={handleSubmitDispute} disabled={submittingDispute || !disputeDealId || !disputeReason}
                     className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25">
-                    {disputeSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
-                    {disputeSubmitting ? "Submitting..." : "Submit Dispute"}
+                    {submittingDispute ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                    {t.dispute.submit_btn}
                   </button>
                 </div>
               </StaggerItem>
             )}
 
-            {/* Active disputes tracker */}
-            {allUserDeals.filter(d => d.status === "disputed").length > 0 && !disputeSuccess && (
-              <StaggerItem index={1}>
-                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm mt-4`}>
-                  <h3 className="font-semibold text-[14px] mb-3">Active Disputes</h3>
-                  <div className="space-y-2.5">
-                    {allUserDeals.filter(d => d.status === "disputed").map((d, i) => (
-                      <div key={d.deal_id} className={`p-3 rounded-xl ${isDark ? "bg-red-500/10 border border-red-500/20" : "bg-red-50 border border-red-200"}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono text-[12px]">{d.deal_id}</span>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${isDark ? "bg-amber-500/10 text-amber-400" : "bg-amber-50 text-amber-600"}`}>
-                            {d.dispute_resolution ? "Resolved" : "Under Review"}
-                          </span>
-                        </div>
-                        <p className={`text-[12px] ${textSecondary}`}>₦{d.amount.toLocaleString()} — {d.description.substring(0, 40)}</p>
-                        {d.dispute_reason && <p className={`text-[11px] mt-1 ${isDark ? "text-red-400/70" : "text-red-500/70"}`}>Reason: {d.dispute_reason.substring(0, 60)}</p>}
+            {activeDisputes.length > 0 && (
+              <div className="mt-8">
+                <h3 className={`text-[12px] font-semibold uppercase tracking-wider mb-3 px-1 ${textSecondary}`}>{t.dispute.active_header}</h3>
+                <div className="space-y-3">
+                  {activeDisputes.map(d => (
+                    <button key={d.id} onClick={() => { setSelectedDeal(d); navigate("deal-detail"); }}
+                      className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl text-left press-effect shadow-sm flex items-center justify-between`}>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[14px] truncate">{d.description || d.deal_id}</p>
+                        <p className={`text-[12px] font-bold text-red-500`}>₦{d.amount.toLocaleString()}</p>
                       </div>
-                    ))}
-                  </div>
+                      <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
+                    </button>
+                  ))}
                 </div>
-              </StaggerItem>
+              </div>
             )}
           </div>
           <MiniFooter />
@@ -1445,61 +1856,49 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="Contact Support" />
-          <div className="px-4 pb-8">
+          <Header title={t.contact.header} />
+          <div className="px-4 pb-8 space-y-4">
             <StaggerItem index={0}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mt-2`}>
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Phone className="w-8 h-8 text-white" />
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-6 text-center shadow-sm`}>
+                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Headset className="w-8 h-8 text-blue-500" />
                 </div>
-                <h3 className="text-[18px] font-bold text-center mb-1">Need Help?</h3>
-                <p className={`text-[13px] text-center ${textSecondary} mb-6`}>We're here to help! Reach out to us via any of the channels below.</p>
-
-                <div className="space-y-3">
-                  <a href="https://t.me/olafemiseyi" target="_blank" rel="noopener noreferrer"
-                    className={`${isDark ? "bg-white/5 hover:bg-white/10" : "bg-black/[0.03] hover:bg-black/[0.06]"} w-full p-4 rounded-xl flex items-center gap-4 press-effect transition-colors`}>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                      <MessageCircle className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-[14px]">Telegram</p>
-                      <p className={`text-[12px] ${textSecondary}`}>@olafemiseyi</p>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 ${textSecondary}`} />
-                  </a>
-
-                  <a href="mailto:lightorbinnovations@gmail.com"
-                    className={`${isDark ? "bg-white/5 hover:bg-white/10" : "bg-black/[0.03] hover:bg-black/[0.06]"} w-full p-4 rounded-xl flex items-center gap-4 press-effect transition-colors`}>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center">
-                      <Mail className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-[14px]">Email</p>
-                      <p className={`text-[12px] ${textSecondary}`}>lightorbinnovations@gmail.com</p>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 ${textSecondary}`} />
-                  </a>
-
-                  <a href="tel:08025100844"
-                    className={`${isDark ? "bg-white/5 hover:bg-white/10" : "bg-black/[0.03] hover:bg-black/[0.06]"} w-full p-4 rounded-xl flex items-center gap-4 press-effect transition-colors`}>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                      <Phone className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-[14px]">Phone / WhatsApp</p>
-                      <p className={`text-[12px] ${textSecondary}`}>08025100844</p>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 ${textSecondary}`} />
-                  </a>
-                </div>
+                <h3 className="text-xl font-bold mb-2">{t.contact.header}</h3>
+                <p className={`text-[14px] ${textSecondary}`}>
+                  {t.contact.desc}
+                </p>
               </div>
             </StaggerItem>
 
             <StaggerItem index={1}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm mt-3`}>
-                <p className={`text-[12px] ${textSecondary} text-center`}>
-                  ⏰ Support hours: Mon—Sat, 9 AM — 6 PM WAT<br />
-                  Average response time: Under 1 hour
+              <div className="grid grid-cols-1 gap-3">
+                {[
+                  { label: "Telegram Support", value: "@lightorbinnovations", icon: <Send className="w-5 h-5" />, color: "bg-blue-500", url: "https://t.me/lightorbinnovations" },
+                  { label: "WhatsApp / Call", value: "+2348025100844", icon: <Phone className="w-5 h-5" />, color: "bg-emerald-500", url: "tel:+2348025100844" },
+                  { label: "Email Address", value: "lightorbinnovations@gmail.com", icon: <Mail className="w-5 h-5" />, color: "bg-red-500", url: "mailto:lightorbinnovations@gmail.com" },
+                ].map((item, i) => (
+                  <button key={i} onClick={() => window.open(item.url, "_blank")}
+                    className={`${cardBg} border ${cardBorder} p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm text-left group`}>
+                    <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20 group-hover:scale-110 transition-transform`}>
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[12px] font-bold uppercase tracking-wider mb-0.5 ${textSecondary}`}>{item.label}</p>
+                      <p className="font-bold text-[15px] truncate">{item.value}</p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 opacity-30" />
+                  </button>
+                ))}
+              </div>
+            </StaggerItem>
+
+            <StaggerItem index={2}>
+              <div className={`p-5 rounded-2xl border ${isDark ? "bg-white/5 border-white/10" : "bg-black/5 border-black/10"} text-center`}>
+                <p className={`text-[13px] font-medium ${textSecondary}`}>
+                  {t.contact.hours_label}: <span className={textPrimary}>{t.contact.hours}</span>
+                </p>
+                <p className={`text-[12px] mt-1 opacity-70 ${textSecondary}`}>
+                  {t.contact.response_time}
                 </p>
               </div>
             </StaggerItem>
@@ -1513,45 +1912,34 @@ export default function MiniAppPage() {
 
   // ===== FAQ / HOW IT WORKS =====
   if (view === "faq") {
-    const faqItems = [
-      { q: "How does escrow work?", a: "The buyer creates a deal, the seller accepts it, the buyer pays into escrow, the seller delivers, and the buyer confirms receipt. Once confirmed, the seller receives 95% of the amount automatically." },
-      { q: "How much is the platform fee?", a: "5% of the deal amount, with a minimum fee of ₦300. For example: a ₦5,000 deal has a ₦300 fee, and the seller receives ₦4,700." },
-      { q: "What is the maximum deal amount?", a: "₦20,000 per transaction. The minimum is ₦100." },
-      { q: "Can I cancel a deal?", a: "Before payment: Yes, either party can cancel freely. Within 1 hour of payment: The buyer gets an automatic refund. After 1 hour: Open a dispute for admin review." },
-      { q: "What happens if there's a problem?", a: "Open a dispute! Your funds are safely held in escrow until an admin reviews and resolves the issue. You can dispute from the deal detail page or the 'Raise Dispute' section." },
-      { q: "How do I receive payment as a seller?", a: "Register your bank account in Settings. When a deal completes, 95% of the amount is automatically transferred to your bank. If you haven't registered, the admin will process it manually." },
-      { q: "What if the seller doesn't deliver?", a: "If the seller doesn't mark delivery within a reasonable time, you can open a dispute. Additionally, funds auto-release 48 hours after delivery is marked if the buyer doesn't confirm." },
-      { q: "Is my money safe?", a: "Absolutely! Funds are held securely in escrow and are only released when the buyer confirms receipt, or after admin dispute resolution. No one can access the funds without proper authorization." },
-    ];
-
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} overflow-x-hidden`}>
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="How It Works" />
-          <div className="px-4 pb-8">
-            {/* Flow diagram */}
+          <Header title={t.faq.header} />
+          <div className="px-4 pb-8 space-y-6">
             <StaggerItem index={0}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mt-2 mb-4`}>
-                <h3 className="font-semibold text-[16px] mb-4">Transaction Flow</h3>
-                <div className="space-y-3">
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm`}>
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                  {t.faq.how_it_works}
+                </h3>
+                <div className="space-y-6">
                   {[
-                    { step: "1", title: "Create Deal", desc: "Buyer enters seller username, amount & description", color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]", emoji: "📝" },
-                    { step: "2", title: "Seller Accepts", desc: "Seller reviews and accepts the deal terms", color: "from-orange-500 to-orange-600", emoji: "✅" },
-                    { step: "3", title: "Buyer Pays", desc: "Buyer pays securely — funds held in escrow", color: "from-blue-500 to-blue-600", emoji: "💳" },
-                    { step: "4", title: "Seller Delivers", desc: "Seller delivers product/service and marks it", color: "from-purple-500 to-purple-600", emoji: "📦" },
-                    { step: "5", title: "Buyer Confirms", desc: "Buyer confirms receipt → funds released!", color: "from-emerald-500 to-emerald-600", emoji: "🎉" },
-                  ].map((item, i) => (
-                    <div key={i} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white text-[12px] font-bold flex-shrink-0`}>{item.step}</div>
-                        {i < 4 && <div className={`w-0.5 flex-1 mt-1 ${isDark ? "bg-white/10" : "bg-black/10"}`} />}
+                    { step: "1", title: t.faq.steps.create_title, desc: t.faq.steps.create_desc },
+                    { step: "2", title: t.faq.steps.fund_title, desc: t.faq.steps.fund_desc },
+                    { step: "3", title: t.faq.steps.delivery_title, desc: t.faq.steps.delivery_desc },
+                    { step: "4", title: t.faq.steps.release_title, desc: t.faq.steps.release_desc },
+                  ].map((s, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        {s.step}
                       </div>
-                      <div className="pb-3">
-                        <p className="font-semibold text-[14px]">{item.emoji} {item.title}</p>
-                        <p className={`text-[12px] ${textSecondary}`}>{item.desc}</p>
+                      <div>
+                        <h4 className="font-bold text-[15px] mb-1">{s.title}</h4>
+                        <p className={`text-[13px] leading-relaxed ${textSecondary}`}>{s.desc}</p>
                       </div>
                     </div>
                   ))}
@@ -1559,26 +1947,30 @@ export default function MiniAppPage() {
               </div>
             </StaggerItem>
 
-            {/* FAQ */}
             <StaggerItem index={1}>
-              <h3 className="font-semibold text-[16px] mb-3 px-1">Frequently Asked Questions</h3>
+              <div className="space-y-3">
+                <h3 className={`text-[12px] font-bold uppercase tracking-wider mb-3 px-1 ${textSecondary}`}>{t.faq.questions_header}</h3>
+                {[
+                  {
+                    q: t.faq.q1.q,
+                    a: t.faq.q1.a
+                  },
+                  {
+                    q: t.faq.q2.q,
+                    a: t.faq.q2.a
+                  },
+                  {
+                    q: t.faq.q3.q,
+                    a: t.faq.q3.a
+                  }
+                ].map((item, i) => (
+                  <div key={i} className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
+                    <h4 className="font-bold text-[14px] mb-2">{item.q}</h4>
+                    <p className={`text-[13px] leading-relaxed ${textSecondary}`}>{item.a}</p>
+                  </div>
+                ))}
+              </div>
             </StaggerItem>
-            <div className="space-y-2">
-              {faqItems.map((item, i) => (
-                <StaggerItem key={i} index={i + 2}>
-                  <details className={`${cardBg} border ${cardBorder} rounded-2xl shadow-sm group`}>
-                    <summary className="px-4 py-3.5 cursor-pointer flex items-center gap-3 press-effect">
-                      <HelpCircle className={`w-4 h-4 flex-shrink-0 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
-                      <span className="font-medium text-[14px] flex-1">{item.q}</span>
-                      <ChevronRight className={`w-4 h-4 ${textSecondary} transition-transform group-open:rotate-90`} />
-                    </summary>
-                    <div className={`px-4 pb-4 pt-0`}>
-                      <p className={`text-[13px] leading-relaxed ${textSecondary}`}>{item.a}</p>
-                    </div>
-                  </details>
-                </StaggerItem>
-              ))}
-            </div>
           </div>
           <MiniFooter />
         </PageTransition>
@@ -1587,49 +1979,74 @@ export default function MiniAppPage() {
     );
   }
 
-  // ===== HISTORY =====
+  // ===== HISTORY VIEW =====
   if (view === "history") {
-    const completedDeals = deals.filter(d => ["completed", "refunded"].includes(d.status));
+    const completedDeals = deals.filter(d => d.status === "completed" || d.status === "cancelled" || d.status === "declined");
+
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} overflow-x-hidden`}>
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="Transaction History" />
+          <Header title={t.history.header} />
           <div className="px-4 pb-8">
-            <p className={`text-[14px] mb-4 ${textSecondary}`}>{completedDeals.length} completed transaction{completedDeals.length !== 1 ? "s" : ""}</p>
-            {loading ? (
-              <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-[hsl(224,71%,50%)]" /></div>
-            ) : completedDeals.length === 0 ? (
-              <StaggerItem index={0}>
-                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-10 text-center shadow-sm`}>
-                  <History className={`w-12 h-12 mx-auto mb-3 ${textSecondary}`} />
-                  <p className="font-semibold text-[15px]">No history yet</p>
-                  <p className={`text-[13px] mt-1 ${textSecondary}`}>Completed deals will appear here</p>
+            <StaggerItem index={0}>
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 mb-6 shadow-sm flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl ${isDark ? "bg-white/5" : "bg-black/5"} flex items-center justify-center text-blue-500`}>
+                    <HistoryIcon className="w-5 h-5" />
+                  </div>
+                  <p className="font-bold text-[15px]">{t.history.transactions}</p>
+                </div>
+                <span className="text-xl font-black">{completedDeals.length}</span>
+              </div>
+            </StaggerItem>
+
+            {completedDeals.length === 0 ? (
+              <StaggerItem index={1}>
+                <div className="py-16 text-center">
+                  <div className={`w-16 h-16 rounded-full ${isDark ? "bg-white/5" : "bg-black/5"} flex items-center justify-center mx-auto mb-4 opacity-30`}>
+                    <Archive className="w-8 h-8" />
+                  </div>
+                  <p className={`${textSecondary}`}>{t.history.empty}</p>
                 </div>
               </StaggerItem>
             ) : (
-              <div className="space-y-2">
-                {completedDeals.map((deal, i) => {
-                  const isBuyer = usernameMatch(deal.buyer_telegram, uname);
-                  const st = statusConfig[deal.status] || statusConfig.completed;
+              <div className="space-y-3">
+                <h3 className={`text-[12px] font-bold uppercase tracking-wider mb-3 px-1 ${textSecondary}`}>{t.history.header}</h3>
+                {completedDeals.map((d, i) => {
+                  const isBuyer = d.buyer_telegram_id === tgUser?.id;
+                  const statusColors = {
+                    completed: "text-emerald-500",
+                    cancelled: "text-gray-500",
+                    declined: "text-red-500",
+                    disputed: "text-amber-500"
+                  };
+
                   return (
-                    <StaggerItem key={deal.id} index={i}>
-                      <button onClick={() => { setSelectedDeal(deal); navigate("deal-detail"); }}
-                        className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl text-left press-effect shadow-sm`}>
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0 pr-2">
-                            <p className="font-semibold text-[14px] leading-tight line-clamp-1">{deal.description}</p>
-                            <p className={`text-[11px] mt-0.5 ${textSecondary}`}>{isBuyer ? "🛒 Bought" : "📦 Sold"} · {new Date(deal.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}</p>
+                    <StaggerItem key={d.id} index={i + 1}>
+                      <button onClick={() => { setSelectedDeal(d); navigate("deal-detail"); }}
+                        className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl text-left press-effect shadow-sm flex items-center justify-between`}>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md ${isBuyer ? "bg-blue-500/10 text-blue-500" : "bg-emerald-500/10 text-emerald-500"
+                              }`}>
+                              {isBuyer ? t.history.bought : t.history.sold}
+                            </span>
+                            <p className="font-bold text-[14px] truncate">{d.description || d.deal_id}</p>
                           </div>
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1 font-medium ${st.bg} ${st.text}`}>
-                            {st.icon} {st.label}
-                          </span>
+                          <p className={`text-[12px] font-bold ${statusColors[d.status as keyof typeof statusColors] || "text-gray-500"} uppercase tracking-tight`}>
+                            {d.status} • ₦{d.amount.toLocaleString()}
+                          </p>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className={`text-[12px] ${textSecondary}`}>{isBuyer ? `→ ${deal.seller_telegram}` : `← ${deal.buyer_telegram}`}</p>
-                          <p className="font-bold text-[15px]">{isBuyer ? "-" : "+"}₦{deal.amount.toLocaleString()}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className={`text-[10px] ${textSecondary}`}>
+                              {new Date(d.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <ChevronRight className={`w-5 h-5 ${textSecondary} opacity-40`} />
                         </div>
                       </button>
                     </StaggerItem>
@@ -1694,13 +2111,12 @@ export default function MiniAppPage() {
 
             {/* Bank Details */}
             <StaggerItem index={1}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm`}>
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mb-4`}>
                 <div className="flex items-center gap-2 mb-4">
                   <CreditCard className={`w-4 h-4 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
                   <h3 className="font-semibold text-[14px]">Bank Account</h3>
                 </div>
-                <p className={`text-[12px] mb-4 ${textSecondary}`}>Add your bank details to receive payouts</p>
-
+                {/* ... existing bank details fields ... */}
                 {profileLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-5 h-5 animate-spin text-[hsl(224,71%,50%)]" />
@@ -1725,21 +2141,6 @@ export default function MiniAppPage() {
                       <input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="John Doe"
                         className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg}`} maxLength={100} />
                     </div>
-
-                    {error && (
-                      <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
-                        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        <p className="text-red-500 text-[13px] font-medium">{error}</p>
-                      </div>
-                    )}
-
-                    {profileSuccess && (
-                      <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                        <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        <p className="text-emerald-500 text-[13px] font-medium">Bank details saved!</p>
-                      </div>
-                    )}
-
                     <button onClick={handleSaveProfile} disabled={savingProfile}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold py-3 rounded-xl text-[14px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 mt-1">
                       {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
@@ -1747,6 +2148,54 @@ export default function MiniAppPage() {
                     </button>
                   </div>
                 )}
+              </div>
+            </StaggerItem>
+
+            {/* Language Selection */}
+            <StaggerItem index={2}>
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mb-4`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Globe className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
+                  <h3 className="font-semibold text-[14px]">{t.settings.language}</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { code: "en" as const, label: "English", flag: "🇬🇧" },
+                    { code: "fr" as const, label: "Français", flag: "🇫🇷" }
+                  ].map((lang) => (
+                    <button key={lang.code} onClick={() => setLanguage(lang.code)}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${language === lang.code ? "bg-amber-500/10 border-amber-500 text-amber-500" : `border-transparent ${isDark ? "bg-white/5" : "bg-black/5"} ${textSecondary}`
+                        }`}>
+                      <span className="text-[16px]">{lang.flag}</span>
+                      <span className="text-[14px] font-bold">{lang.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </StaggerItem>
+
+            {/* Notifications */}
+            <StaggerItem index={3}>
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm`}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Bell className={`w-4 h-4 ${isDark ? "text-blue-400" : "text-blue-500"}`} />
+                  <h3 className="font-semibold text-[14px]">{t.settings.notifications.header}</h3>
+                </div>
+                <div className="space-y-4">
+                  {[
+                    { key: "transactions" as const, label: t.settings.notifications.transactions },
+                    { key: "disputes" as const, label: t.settings.notifications.disputes },
+                    { key: "promotions" as const, label: t.settings.notifications.promotions }
+                  ].map((item) => (
+                    <div key={item.key} className="flex items-center justify-between">
+                      <span className={`text-[14px] ${textSecondary}`}>{item.label}</span>
+                      <button onClick={() => toggleNotif(item.key)}
+                        className={`w-10 h-6 rounded-full relative transition-colors ${notifSettings[item.key] ? "bg-blue-500" : (isDark ? "bg-white/10" : "bg-black/10")}`}>
+                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${notifSettings[item.key] ? "left-5" : "left-1"}`} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </StaggerItem>
           </div>
@@ -1765,9 +2214,9 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="New Deal" />
+          <Header title={t.new_deal.header} />
           <div className="px-4 pb-8">
-            <p className={`text-[14px] mb-4 ${textSecondary}`}>You're the buyer — enter the seller's details</p>
+            <p className={`text-[14px] mb-4 ${textSecondary}`}>{t.new_deal.buyer_hint}</p>
 
             {successDeal ? (
               <StaggerItem index={0}>
@@ -1775,38 +2224,38 @@ export default function MiniAppPage() {
                   <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-emerald-500" />
                   </div>
-                  <p className="text-lg font-bold">Deal Created!</p>
+                  <p className="text-lg font-bold">{t.new_deal.created}</p>
                   <p className={`text-sm mt-1 font-mono ${textSecondary}`}>{successDeal}</p>
-                  <p className={`text-xs mt-2 ${textSecondary}`}>Waiting for seller to accept.</p>
+                  <p className={`text-xs mt-2 ${textSecondary}`}>{t.new_deal.waiting}</p>
                 </div>
               </StaggerItem>
             ) : (
               <StaggerItem index={0}>
                 <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm space-y-4`}>
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>Seller Username</label>
-                    <input value={sellerUsername} onChange={(e) => setSellerUsername(e.target.value)} placeholder="@username"
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.seller}</label>
+                    <input value={sellerUsername} onChange={(e) => setSellerUsername(e.target.value)} placeholder={t.new_deal.form.placeholder_user}
                       className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`} />
                   </div>
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>Amount (₦)</label>
-                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="100 – 20,000"
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.amount}</label>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t.new_deal.form.placeholder_amount}
                       className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`} />
                   </div>
                   <div>
-                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>Description</label>
-                    <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What are you buying?"
+                    <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.description}</label>
+                    <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t.new_deal.form.placeholder_desc}
                       className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`} maxLength={200} />
                   </div>
 
                   {amount && parseInt(amount) >= 100 && parseInt(amount) <= 20000 && (
                     <div className={`p-3.5 rounded-xl text-[13px] border ${cardBorder} ${isDark ? "bg-white/[0.02]" : "bg-black/[0.015]"}`}>
                       <div className="flex justify-between mb-1">
-                        <span className={textSecondary}>Platform fee (5%)</span>
+                        <span className={textSecondary}>{t.new_deal.form.fee_label}</span>
                         <span className="font-medium">₦{Math.max(300, Math.round(parseInt(amount) * 0.05)).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className={textSecondary}>Seller receives</span>
+                        <span className={textSecondary}>{t.new_deal.form.seller_receives}</span>
                         <span className="font-semibold text-emerald-500">₦{(parseInt(amount) - Math.max(300, Math.round(parseInt(amount) * 0.05))).toLocaleString()}</span>
                       </div>
                     </div>
@@ -1822,7 +2271,7 @@ export default function MiniAppPage() {
                   <button onClick={handleCreateDeal} disabled={creating}
                     className="w-full bg-gradient-to-r from-[hsl(224,71%,40%)] to-[hsl(224,71%,52%)] text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-[hsl(224,71%,40%)/0.25] mt-2">
                     {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    {creating ? "Creating Deal..." : "Create Deal"}
+                    {creating ? `${t.common.loading}...` : t.home.create_btn}
                   </button>
                 </div>
               </StaggerItem>
@@ -1844,22 +2293,22 @@ export default function MiniAppPage() {
         <NotificationsOverlay />
         <RatingModal />
         <PageTransition direction={direction}>
-          <Header title="My Deals" />
+          <Header title={t.deals.header} />
           <div className="px-4 pb-8">
-            <p className={`text-[14px] mb-4 ${textSecondary}`}>{deals.length} transaction{deals.length !== 1 ? "s" : ""}</p>
+            <p className={`text-[14px] mb-4 ${textSecondary}`}>{deals.length} {deals.length !== 1 ? t.deals.header.toLowerCase() : t.deals.header.toLowerCase().replace(/s$/, "")}</p>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <Loader2 className="w-7 h-7 animate-spin text-[hsl(224,71%,50%)]" />
-                <p className={`text-[13px] ${textSecondary}`}>Loading deals...</p>
+                <p className={`text-[13px] ${textSecondary}`}>{t.deals.loading_deals}</p>
               </div>
             ) : deals.length === 0 ? (
               <StaggerItem index={0}>
                 <div className={`${cardBg} border ${cardBorder} rounded-2xl p-10 text-center shadow-sm`}>
                   <List className={`w-12 h-12 mx-auto mb-3 ${textSecondary}`} />
-                  <p className="font-semibold text-[15px]">No deals yet</p>
-                  <p className={`text-[13px] mt-1 ${textSecondary}`}>Create your first secure transaction</p>
-                  <button onClick={() => navigate("new-deal")} className="mt-4 text-[hsl(224,71%,50%)] text-[14px] font-semibold press-effect">Create Deal →</button>
+                  <p className="font-semibold text-[15px]">{t.deals.no_deals}</p>
+                  <p className={`text-[13px] mt-1 ${textSecondary}`}>{t.deals.create_first}</p>
+                  <button onClick={() => navigate("new-deal")} className="mt-4 text-[hsl(224,71%,50%)] text-[14px] font-semibold press-effect">{t.home.create_btn} →</button>
                 </div>
               </StaggerItem>
             ) : (
@@ -1868,7 +2317,7 @@ export default function MiniAppPage() {
                   const st = statusConfig[deal.status] || statusConfig.pending;
                   const isBuyer = usernameMatch(deal.buyer_telegram, `@${tgUser?.username}`);
                   const isSeller = usernameMatch(deal.seller_telegram, `@${tgUser?.username}`);
-                  const statusLabel = deal.status === "funded" && deal.delivered_at ? "Delivered" : st.label;
+                  const statusLabel = deal.status === "funded" && deal.delivered_at ? t.deals.delivered : (st.label === "Accepted" ? t.details.progress.accepted : st.label === "Funded" ? t.details.progress.paid : st.label);
                   const needsAction = (isSeller && deal.status === "pending") ||
                     (isBuyer && deal.status === "accepted") ||
                     (isBuyer && deal.status === "funded" && deal.delivered_at);
@@ -1879,7 +2328,7 @@ export default function MiniAppPage() {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1 min-w-0 pr-2">
                             <p className="font-semibold text-[14px] leading-tight line-clamp-1">{deal.description}</p>
-                            <p className={`text-[11px] mt-0.5 ${textSecondary}`}>{isBuyer ? "🛒 You're buying" : "📦 You're selling"}</p>
+                            <p className={`text-[11px] mt-0.5 ${textSecondary}`}>{isBuyer ? `🛒 ${t.deals.buying_label}` : `📦 ${t.deals.selling_label}`}</p>
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             {needsAction && <span className="w-2 h-2 rounded-full bg-amber-500 badge-pulse" />}
@@ -1911,6 +2360,7 @@ export default function MiniAppPage() {
     const st = statusConfig[selectedDeal.status] || statusConfig.pending;
     const isBuyer = usernameMatch(selectedDeal.buyer_telegram, `@${tgUser?.username}`);
     const isSeller = usernameMatch(selectedDeal.seller_telegram, `@${tgUser?.username}`);
+    const statusLabel = selectedDeal.status === "funded" && selectedDeal.delivered_at ? t.deals.delivered : (st.label === "Accepted" ? t.details.progress.accepted : st.label === "Funded" ? t.details.progress.paid : st.label);
 
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} overflow-x-hidden`}>
@@ -1919,38 +2369,40 @@ export default function MiniAppPage() {
         <NotificationsOverlay />
         <RatingModal />
         <PageTransition direction={direction}>
-          <Header title="Deal Details" backTo="my-deals" />
+          <Header title={t.details.header} backTo="my-deals" />
           <div className="px-4 pb-8">
             <StaggerItem index={0}>
               <div className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm`}>
                 <div className={`px-5 py-3 flex items-center justify-between border-b ${cardBorder}`}>
                   <div>
                     <span className="font-mono text-[12px] text-muted-foreground">{selectedDeal.deal_id}</span>
-                    <p className={`text-[11px] mt-0.5 ${textSecondary}`}>{isBuyer ? "🛒 You're the buyer" : isSeller ? "📦 You're the seller" : "Participant"}</p>
+                    <p className={`text-[11px] mt-0.5 ${textSecondary}`}>
+                      {isBuyer ? t.details.participants.buyer : isSeller ? t.details.participants.seller : t.details.participants.participant}
+                    </p>
                   </div>
                   <span className={`text-[11px] px-2.5 py-1 rounded-full flex items-center gap-1 font-semibold ${st.bg} ${st.text}`}>
-                    {st.icon} {selectedDeal.status === "funded" && selectedDeal.delivered_at ? "Delivered" : st.label}
+                    {st.icon} {statusLabel}
                   </span>
                 </div>
 
                 <div className="text-center py-6">
-                  <p className={`text-[12px] ${textSecondary} mb-1`}>Amount</p>
+                  <p className={`text-[12px] ${textSecondary} mb-1`}>{t.common.amount}</p>
                   <p className="text-[32px] font-bold tracking-tight">₦{selectedDeal.amount.toLocaleString()}</p>
                   <p className={`text-[12px] mt-1 ${textSecondary}`}>
-                    Fee: ₦{selectedDeal.fee.toLocaleString()} · Seller gets: ₦{(selectedDeal.amount - selectedDeal.fee).toLocaleString()}
+                    {t.details.fee_info.replace("{fee}", selectedDeal.fee.toLocaleString()).replace("{payout}", (selectedDeal.amount - selectedDeal.fee).toLocaleString())}
                   </p>
                 </div>
 
                 {/* Progress tracker */}
                 <div className={`border-t ${cardBorder} px-5 py-4`}>
-                  <p className={`text-[11px] font-semibold uppercase tracking-wider mb-3 ${textSecondary}`}>Progress</p>
+                  <p className={`text-[11px] font-semibold uppercase tracking-wider mb-3 ${textSecondary}`}>{t.details.progress.header}</p>
                   <div className="flex items-center gap-1">
                     {[
-                      { label: "Created", done: true },
-                      { label: "Accepted", done: ["accepted", "funded", "completed"].includes(selectedDeal.status) },
-                      { label: "Paid", done: ["funded", "completed"].includes(selectedDeal.status) },
-                      { label: "Delivered", done: !!selectedDeal.delivered_at || selectedDeal.status === "completed" },
-                      { label: "Confirmed", done: selectedDeal.status === "completed" },
+                      { label: t.details.progress.created, done: true },
+                      { label: t.details.progress.accepted, done: ["accepted", "funded", "completed"].includes(selectedDeal.status) },
+                      { label: t.details.progress.paid, done: ["funded", "completed"].includes(selectedDeal.status) },
+                      { label: t.details.progress.delivered, done: !!selectedDeal.delivered_at || selectedDeal.status === "completed" },
+                      { label: t.details.progress.confirmed, done: selectedDeal.status === "completed" },
                     ].map((step, i) => (
                       <div key={i} className="flex items-center gap-1 flex-1">
                         <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${step.done ? "bg-emerald-500 text-white" : (isDark ? "bg-white/10 text-white/30" : "bg-black/5 text-black/20")}`}>
@@ -1961,7 +2413,7 @@ export default function MiniAppPage() {
                     ))}
                   </div>
                   <div className="flex justify-between mt-1">
-                    {["Created", "Accepted", "Paid", "Delivered", "Done"].map((l, i) => (
+                    {[t.details.progress.created, t.details.progress.accepted, t.details.progress.paid, t.details.progress.delivered, t.details.progress.done].map((l, i) => (
                       <span key={i} className={`text-[8px] ${textSecondary} flex-1 text-center`}>{l}</span>
                     ))}
                   </div>
@@ -1969,10 +2421,10 @@ export default function MiniAppPage() {
 
                 <div className={`border-t ${cardBorder} px-5 py-4 space-y-3`}>
                   {[
-                    { label: "Description", value: selectedDeal.description },
-                    { label: "Buyer", value: selectedDeal.buyer_telegram },
-                    { label: "Seller", value: selectedDeal.seller_telegram },
-                    { label: "Created", value: new Date(selectedDeal.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) },
+                    { label: t.details.fields.description, value: selectedDeal.description },
+                    { label: t.details.fields.buyer, value: selectedDeal.buyer_telegram },
+                    { label: t.details.fields.seller, value: selectedDeal.seller_telegram },
+                    { label: t.details.fields.created, value: new Date(selectedDeal.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) },
                   ].map((row) => (
                     <div key={row.label} className="flex justify-between items-center">
                       <span className={`text-[13px] ${textSecondary}`}>{row.label}</span>
@@ -1987,13 +2439,13 @@ export default function MiniAppPage() {
                     <button onClick={() => handleAcceptDeal(selectedDeal)} disabled={actionLoading}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect shadow-lg shadow-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2">
                       {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                      ✅ Accept Deal
+                      ✅ {t.details.actions.accept}
                     </button>
                     <button onClick={() => handleDeclineDeal(selectedDeal)} disabled={actionLoading}
                       className={`w-full font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 ${isDark ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-red-50 text-red-600 border border-red-200"} flex items-center justify-center gap-2`}>
-                      🚫 Decline Deal
+                      🚫 {t.details.actions.decline}
                     </button>
-                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>Accept to let the buyer proceed with payment</p>
+                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>{t.details.actions.accept_hint}</p>
                   </div>
                 )}
 
@@ -2002,7 +2454,7 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-amber-500/10 border border-amber-500/20" : "bg-amber-50 border border-amber-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-amber-400" : "text-amber-600"}`}>
-                        ⏳ Waiting for seller to accept. You'll be notified once they accept.
+                        ⏳ {t.details.actions.waiting_seller}
                       </p>
                     </div>
                   </div>
@@ -2013,9 +2465,9 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <a href={selectedDeal.paystack_payment_link} target="_blank" rel="noopener noreferrer"
                       className="block w-full bg-gradient-to-r from-[hsl(224,71%,40%)] to-[hsl(224,71%,52%)] text-white text-center font-semibold py-3.5 rounded-xl text-[15px] press-effect shadow-lg shadow-[hsl(224,71%,40%)/0.25]">
-                      💳 Pay ₦{selectedDeal.amount.toLocaleString()}
+                      💳 {t.details.actions.pay_btn.replace("{amount}", selectedDeal.amount.toLocaleString())}
                     </a>
-                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>Seller has accepted! Tap to pay securely.</p>
+                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>{t.details.actions.pay_hint}</p>
                   </div>
                 )}
 
@@ -2023,7 +2475,7 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-orange-500/10 border border-orange-500/20" : "bg-orange-50 border border-orange-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-orange-400" : "text-orange-600"}`}>
-                        🎉 Seller accepted! Use the Telegram chat to tap "💳 Pay" to generate your payment link.
+                        🎉 {t.details.actions.pay_telegram_hint}
                       </p>
                     </div>
                   </div>
@@ -2034,7 +2486,7 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-orange-500/10 border border-orange-500/20" : "bg-orange-50 border border-orange-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-orange-400" : "text-orange-600"}`}>
-                        ✅ You accepted! Waiting for buyer to pay.
+                        ✅ {t.details.actions.waiting_payment}
                       </p>
                     </div>
                   </div>
@@ -2046,9 +2498,9 @@ export default function MiniAppPage() {
                     <button onClick={() => handleMarkDelivered(selectedDeal)} disabled={actionLoading}
                       className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect shadow-lg shadow-purple-500/25 disabled:opacity-50 flex items-center justify-center gap-2">
                       {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
-                      📦 Mark as Delivered
+                      📦 {t.details.actions.mark_delivered}
                     </button>
-                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>Tap once you've delivered to the buyer</p>
+                    <p className={`text-[11px] mt-2 text-center ${textSecondary}`}>{t.details.actions.delivered_hint}</p>
                   </div>
                 )}
 
@@ -2057,7 +2509,7 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-blue-500/10 border border-blue-500/20" : "bg-blue-50 border border-blue-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                        ✅ Delivered! Waiting for buyer to confirm. ₦{(selectedDeal.amount - selectedDeal.fee).toLocaleString()} will be sent to your bank.
+                        ✅ {t.details.actions.waiting_confirmation.replace("{payout}", (selectedDeal.amount - selectedDeal.fee).toLocaleString())}
                       </p>
                     </div>
                   </div>
@@ -2067,16 +2519,16 @@ export default function MiniAppPage() {
                 {isBuyer && selectedDeal.status === "funded" && selectedDeal.delivered_at && (
                   <div className={`border-t ${cardBorder} p-4 space-y-2`}>
                     <div className={`p-3 rounded-xl mb-2 ${isDark ? "bg-purple-500/10 border border-purple-500/20" : "bg-purple-50 border border-purple-200"}`}>
-                      <p className={`text-[12px] font-medium ${isDark ? "text-purple-400" : "text-purple-600"}`}>📦 Seller has marked this as delivered!</p>
+                      <p className={`text-[12px] font-medium ${isDark ? "text-purple-400" : "text-purple-600"}`}>📦 {t.details.actions.seller_marked}</p>
                     </div>
                     <button onClick={() => handleConfirmReceived(selectedDeal)} disabled={actionLoading}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect shadow-lg shadow-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2">
                       {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      ✅ Confirm Received — Release Funds
+                      ✅ {t.details.actions.confirm_received}
                     </button>
                     <button onClick={() => handleOpenDispute(selectedDeal)} disabled={actionLoading}
                       className={`w-full font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 ${isDark ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-red-50 text-red-600 border border-red-200"}`}>
-                      ⚠️ Open Dispute
+                      ⚠️ {t.details.actions.open_dispute}
                     </button>
                   </div>
                 )}
@@ -2086,12 +2538,12 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-blue-500/10 border border-blue-500/20" : "bg-blue-50 border border-blue-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-blue-400" : "text-blue-600"}`}>
-                        💰 Payment confirmed! Waiting for seller to deliver.
+                        💰 {t.details.actions.payment_confirmed}
                       </p>
                     </div>
                     <button onClick={() => handleOpenDispute(selectedDeal)} disabled={actionLoading}
                       className={`w-full mt-2 font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 ${isDark ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-red-50 text-red-600 border border-red-200"}`}>
-                      ⚠️ Open Dispute
+                      ⚠️ {t.details.actions.open_dispute}
                     </button>
                   </div>
                 )}
@@ -2100,7 +2552,7 @@ export default function MiniAppPage() {
                 {selectedDeal.refund_status && (
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-orange-500/10 border border-orange-500/20" : "bg-orange-50 border border-orange-200"}`}>
-                      <p className={`text-[12px] font-semibold mb-2 ${isDark ? "text-orange-400" : "text-orange-600"}`}>💸 Refund Status</p>
+                      <p className={`text-[12px] font-semibold mb-2 ${isDark ? "text-orange-400" : "text-orange-600"}`}>💸 {t.details.actions.refund_status}</p>
                       <div className="flex items-center gap-2">
                         {["initiated", "processing", "completed"].map((step, i) => {
                           const stages = ["initiated", "processing", "completed"];
@@ -2126,13 +2578,13 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-emerald-50 border border-emerald-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>
-                        🎉 Deal complete! {isSeller ? `₦${(selectedDeal.amount - selectedDeal.fee).toLocaleString()} released to you.` : "Funds released to seller."}
+                        🎉 {t.details.actions.deal_complete} {isSeller ? t.details.actions.payout_released.replace("{amount}", (selectedDeal.amount - selectedDeal.fee).toLocaleString()) : t.details.actions.funds_released}
                       </p>
                     </div>
                     {/* Rate button for completed deals */}
                     <button onClick={() => { setRatingDealId(selectedDeal.deal_id); setRatingValue(0); setRatingComment(""); setShowRatingModal(true); }}
                       className={`w-full mt-2 font-semibold py-3 rounded-xl text-[14px] press-effect ${isDark ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-amber-50 text-amber-600 border border-amber-200"} flex items-center justify-center gap-2`}>
-                      <Star className="w-4 h-4" /> Rate This Deal
+                      <Star className="w-4 h-4" /> {t.details.actions.rate_deal}
                     </button>
                   </div>
                 )}
@@ -2142,10 +2594,10 @@ export default function MiniAppPage() {
                   <div className={`border-t ${cardBorder} p-4`}>
                     <div className={`p-3.5 rounded-xl ${isDark ? "bg-red-500/10 border border-red-500/20" : "bg-red-50 border border-red-200"}`}>
                       <p className={`text-[13px] font-medium ${isDark ? "text-red-400" : "text-red-600"}`}>
-                        ⚠️ Under dispute. Admin will review and resolve. Funds are safely held.
+                        ⚠️ {t.details.actions.under_dispute}
                       </p>
                       {selectedDeal.dispute_reason && (
-                        <p className={`text-[12px] mt-1 ${isDark ? "text-red-400/60" : "text-red-500/60"}`}>Reason: {selectedDeal.dispute_reason}</p>
+                        <p className={`text-[12px] mt-1 ${isDark ? "text-red-400/60" : "text-red-500/60"}`}>{t.common.description}: {selectedDeal.dispute_reason}</p>
                       )}
                     </div>
                   </div>
