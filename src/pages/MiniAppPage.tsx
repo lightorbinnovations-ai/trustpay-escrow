@@ -36,7 +36,8 @@ type TelegramUser = { id: number; username: string; firstName: string; lastName?
 type UserProfile = { bank_name: string | null; account_number: string | null; account_name: string | null; telegram_username: string };
 type Rating = { id: string; deal_id: string; rater_telegram: string; rated_telegram: string; rating: number; comment: string; created_at: string };
 
-function usernameMatch(a: string, b: string): boolean {
+function usernameMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
   return a.toLowerCase().replace(/^@/, "") === b.toLowerCase().replace(/^@/, "");
 }
 
@@ -591,16 +592,23 @@ export default function MiniAppPage() {
           lastName: user.last_name,
           photoUrl: user.photo_url,
         });
+      }
+    }
+  }, []);
 
-        // Handle deep link (start_param)
-        const startParam = (webApp.initDataUnsafe as any).start_param;
-        if (startParam && startParam.startsWith('escrow_')) {
-          const listingId = startParam.replace('escrow_', '');
+  // Handle deep link (start_param) precisely
+  useEffect(() => {
+    if (webApp && tgUser) {
+      const startParam = (webApp.initDataUnsafe as any).start_param;
+      if (startParam && startParam.startsWith('escrow_')) {
+        const listingId = startParam.replace('escrow_', '');
+        // Only fetch if we haven't already pre-populated for this listing or if we're not already on a path
+        if (activeListingId !== listingId) {
           fetchMarketListing(listingId);
         }
       }
     }
-  }, []);
+  }, [tgUser, webApp]);
 
   const fetchMarketListing = async (listingId: string) => {
     setLoading(true);
@@ -629,13 +637,16 @@ export default function MiniAppPage() {
         console.error("Error fetching seller:", sellerError);
       }
 
-      // Auto-populate the New Deal form
+      // 1. Set form data
       setSellerUsername(seller?.username ? `@${seller.username}` : (seller?.first_name || ""));
       setAmount(listing.price?.toString() || "");
       setDescription(`Order for ${listing.title}`);
       setActiveListingId(listingId);
 
-      // Navigate to New Deal view
+      // 2. Clear flags and navigate
+      setSuccessDeal(null);
+      setError("");
+      setDirection("forward");
       setView("new-deal");
       webApp?.HapticFeedback?.notificationOccurred("success");
     } catch (err) {
@@ -1247,26 +1258,26 @@ export default function MiniAppPage() {
   const BANKS = ["Access Bank", "GTBank", "First Bank", "UBA", "Zenith Bank", "Kuda", "OPay", "PalmPay", "Moniepoint", "Wema Bank", "Sterling Bank", "Fidelity Bank", "FCMB", "Union Bank", "Polaris Bank", "Stanbic IBTC"];
 
   const uname = `@${tgUser?.username || ""}`;
-  const pendingSellerActions = homeDeals.filter(d => d.status === "pending" && usernameMatch(d.seller_telegram, uname)).length;
-  const pendingBuyerActions = homeDeals.filter(d => {
+  const pendingSellerActions = (homeDeals || []).filter(d => d.status === "pending" && usernameMatch(d.seller_telegram, uname)).length;
+  const pendingBuyerActions = (homeDeals || []).filter(d => {
     const isBuyer = usernameMatch(d.buyer_telegram, uname);
     return isBuyer && (d.status === "accepted" || (d.status === "funded" && d.delivered_at));
   }).length;
   const totalPendingActions = pendingSellerActions + pendingBuyerActions;
 
-  const buyDeals = allUserDeals.filter(d => usernameMatch(d.buyer_telegram, uname));
-  const sellDeals = allUserDeals.filter(d => usernameMatch(d.seller_telegram, uname));
+  const buyDeals = (allUserDeals || []).filter(d => usernameMatch(d.buyer_telegram, uname));
+  const sellDeals = (allUserDeals || []).filter(d => usernameMatch(d.seller_telegram, uname));
   const completedBuys = buyDeals.filter(d => d.status === "completed").length;
   const completedSells = sellDeals.filter(d => d.status === "completed").length;
-  const totalSpent = buyDeals.filter(d => d.status === "completed").reduce((s, d) => s + d.amount, 0);
-  const totalEarned = sellDeals.filter(d => d.status === "completed").reduce((s, d) => s + (d.amount - d.fee), 0);
+  const totalSpent = buyDeals.filter(d => d.status === "completed").reduce((s, d) => s + (d.amount || 0), 0);
+  const totalEarned = sellDeals.filter(d => d.status === "completed").reduce((s, d) => s + ((d.amount || 0) - (d.fee || 0)), 0);
   const activeBuyDeals = buyDeals.filter(d => !["completed", "refunded"].includes(d.status)).length;
   const activeSellDeals = sellDeals.filter(d => !["completed", "refunded"].includes(d.status)).length;
-  const disputedDeals = allUserDeals.filter(d => d.status === "disputed").length;
+  const disputedDeals = (allUserDeals || []).filter(d => d.status === "disputed").length;
 
   // Avg rating received
-  const ratingsReceived = userRatings.filter(r => usernameMatch(r.rated_telegram, uname));
-  const avgRating = ratingsReceived.length > 0 ? (ratingsReceived.reduce((s, r) => s + r.rating, 0) / ratingsReceived.length).toFixed(1) : "—";
+  const ratingsReceived = (userRatings || []).filter(r => usernameMatch(r.rated_telegram, uname));
+  const avgRating = ratingsReceived.length > 0 ? (ratingsReceived.reduce((s, r) => s + (r.rating || 0), 0) / ratingsReceived.length).toFixed(1) : "—";
 
   // Disputable deals (funded, user is buyer)
   const disputableDeals = deals.filter(d => d.status === "funded" && usernameMatch(d.buyer_telegram, uname));
