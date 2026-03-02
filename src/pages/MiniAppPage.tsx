@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { marketSupabase } from "@/integrations/supabase/market-client";
-import { Globe, Shield, Plus, List, AlertTriangle, CheckCircle, Clock, Loader2, ArrowLeft, Send, ChevronRight, Sparkles, Package, Bell, ShoppingCart, Store, TrendingUp, Wallet, ArrowDownLeft, ArrowUpRight, Settings, CreditCard, User, Menu, X, Home, FileText, Phone, HelpCircle, History, Star, MessageCircle, Mail, Upload, Camera, Zap, Search } from "lucide-react";
+import { Globe, Shield, Plus, List, AlertTriangle, CheckCircle, Clock, Loader2, ArrowLeft, Send, ChevronRight, Sparkles, Package, Bell, ShoppingCart, Store, TrendingUp, Wallet, ArrowDownLeft, ArrowUpRight, Settings, CreditCard, User, Menu, X, Home, FileText, Phone, HelpCircle, History as HistoryIcon, Star, MessageCircle, Mail, Upload, Camera, Zap, Search, Headset, ExternalLink, ShieldCheck, Archive } from "lucide-react";
 
 declare global {
   interface Window {
     Telegram?: {
-      WebApp: {
+      WebApp?: {
         initData: string;
         initDataUnsafe: {
           user?: {
@@ -17,6 +17,7 @@ declare global {
             photo_url?: string;
           };
           query_id?: string;
+          start_param?: string;
         };
         ready: () => void; close: () => void; expand: () => void;
         MainButton: { text: string; show: () => void; hide: () => void; onClick: (cb: () => void) => void; offClick: (cb: () => void) => void; enable: () => void; disable: () => void; showProgress: (leaveActive?: boolean) => void; hideProgress: () => void };
@@ -182,7 +183,8 @@ const translations = {
         select_bank: "Select bank...",
         account_number: "Account Number",
         account_name: "Account Name",
-        save_btn: "Save Bank Details"
+        save_btn: "Save Bank Details",
+        saving: "Saving..."
       },
       language: "Language",
       notifications: {
@@ -190,35 +192,64 @@ const translations = {
         desc: "Manage alert preferences",
         transactions: "Transaction Updates",
         disputes: "Dispute Alerts",
-        promotions: "Promotions & Tips"
+        promotions: "Promotions & Tips",
+        mark_all: "Mark all as read"
       }
     },
     contact: {
       header: "Contact Support",
       support_hours: "Support hours: Mon—Sat, 9 AM — 6 PM WAT",
       response_time: "Average response time: Under 1 hour",
-      need_help: "Need immediate help? Reach us through any of these channels:"
+      desc: "Need immediate help? Reach us through any of these channels:",
+      hours_label: "Support hours",
+      hours: "Mon—Sat, 9 AM — 6 PM WAT"
     },
     faq: {
       header: "How It Works",
-      flow: "Transaction Flow",
-      steps: [
-        { title: "Create Deal", desc: "Buyer enters seller username, amount & description" },
-        { title: "Seller Accepts", desc: "Seller reviews and accepts the deal terms" },
-        { title: "Buyer Pays", desc: "Buyer pays securely — funds held in escrow" },
-        { title: "Seller Delivers", desc: "Seller delivers product/service and marks it" },
-        { title: "Buyer Confirms", desc: "Buyer confirms receipt → funds released!" }
-      ],
-      faq_header: "Frequently Asked Questions"
+      how_it_works: "Transaction Flow",
+      steps: {
+        create_title: "Create Deal",
+        create_desc: "Buyer enters seller username, amount & description",
+        accept_title: "Seller Accepts",
+        accept_desc: "Seller reviews and accepts the deal terms",
+        pay_title: "Buyer Pays",
+        pay_desc: "Buyer pays securely — funds held in escrow",
+        deliver_title: "Seller Delivers",
+        deliver_desc: "Seller delivers product/service and marks it",
+        confirm_title: "Buyer Confirms",
+        confirm_desc: "Buyer confirms receipt → funds released!"
+      },
+      questions_header: "Frequently Asked Questions",
+      q1: { q: "Is it secure?", a: "Yes! Funds are held until the buyer confirms receipt. If anything goes wrong, you can open a dispute." },
+      q2: { q: "How much does it cost?", a: "We charge a 5% platform fee per transaction to ensure a safe and secure service." },
+      q3: { q: "What if the seller doesn't deliver?", a: "If the seller fails to deliver, you can open a dispute and our team will refund you after verification." }
     },
     history: {
       header: "Transaction History",
-      count_label: "completed transactions",
-      single_count_label: "completed transaction",
-      no_history: "No history yet",
-      history_desc: "Completed deals will appear here",
+      transactions: "Transactions",
+      empty: "No history yet",
       bought: "Bought",
       sold: "Sold"
+    },
+    sidebar: {
+      dashboard: "Dashboard",
+      dashboard_sub: "Overview & stats",
+      my_deals: "My Deals",
+      my_deals_sub: "Active & pending deals",
+      new_deal: "New Deal",
+      new_deal_sub: "Create escrow transaction",
+      dispute: "Raise Dispute",
+      dispute_sub: "Report an issue",
+      history: "History",
+      history_sub: "Past transactions",
+      support: "Contact Support",
+      support_sub: "Get help from us",
+      how_it_works: "How It Works",
+      how_it_works_sub: "Learn about escrow",
+      settings: "Settings",
+      settings_sub: "Account preferences",
+      our_bots: "Our Bots",
+      market_sub: "Buy & sell on Telegram"
     },
     rating: {
       header: "Rate Your Experience",
@@ -226,6 +257,15 @@ const translations = {
       placeholder: "Leave a comment (optional)",
       submit: "Submit Rating",
       skip: "Skip"
+    },
+    footer: {
+      powered: "Powered by"
+    },
+    notifications: {
+      header: "Notifications",
+      mark_all: "Mark all as read",
+      empty: "No notifications yet",
+      empty_desc: "You'll see deal updates here"
     }
   },
   fr: {
@@ -370,7 +410,8 @@ const translations = {
         select_bank: "Sélectionner une banque...",
         account_number: "Numéro de Compte",
         account_name: "Nom du Compte",
-        save_btn: "Enregistrer les Infos"
+        save_btn: "Enregistrer les Infos",
+        saving: "Enregistrement..."
       },
       language: "Langue",
       notifications: {
@@ -378,35 +419,67 @@ const translations = {
         desc: "Gérer vos alertes",
         transactions: "Mises à jour des deals",
         disputes: "Alertes de litige",
-        promotions: "Promotions et Astuces"
+        promotions: "Promotions et Astuces",
+        mark_all: "Tout marquer comme lu"
       }
     },
     contact: {
       header: "Support",
       support_hours: "Heures: Lun—Sam, 9h — 18h WAT",
       response_time: "Réponse en moins d'une heure",
-      need_help: "Besoin d'aide ? Contactez-nous ici :"
+      desc: "Besoin d'aide immédiate ? Contactez-nous par l'un de ces canaux :",
+      hours_label: "Heures de support",
+      hours: "Lun—Sam, 9h — 18h WAT"
     },
     faq: {
       header: "Comment ça marche",
-      flow: "Flux de Transaction",
-      steps: [
-        { title: "Créer Deal", desc: "L'acheteur entre les détails" },
-        { title: "Vendeur Accepte", desc: "Le vendeur examine et valide" },
-        { title: "Acheteur Paye", desc: "Fonds bloqués en séquestre" },
-        { title: "Vendeur Livre", desc: "Le vendeur envoie et notifie" },
-        { title: "Acheteur Confirme", desc: "Fonds libérés au vendeur !" }
-      ],
-      faq_header: "Questions Fréquentes"
+      how_it_works: "Flux de Transaction",
+      steps: {
+        create_title: "Créer Deal",
+        create_desc: "L'acheteur entre le nom d'utilisateur du vendeur, le montant et la description",
+        accept_title: "Le vendeur accepte",
+        accept_desc: "Le vendeur examine et accepte les conditions de la transaction",
+        pay_title: "L'acheteur paye",
+        pay_desc: "L'acheteur paye en toute sécurité - les fonds sont bloqués en séquestre",
+        deliver_title: "Le vendeur livre",
+        deliver_desc: "Le vendeur livre le produit/service et le marque comme livré",
+        confirm_title: "L'acheteur confirme",
+        confirm_desc: "L'acheteur confirme la réception → les fonds sont libérés!"
+      },
+      questions_header: "Questions Fréquemment Posées",
+      q1: { q: "Est-ce sécurisé ?", a: "Oui ! Les fonds sont bloqués jusqu'à ce que l'acheteur confirme la réception. Si un problème survient, vous pouvez ouvrir un litige." },
+      q2: { q: "Combien ça coûte ?", a: "Nous prélevons des frais de plateforme de 5% par transaction pour assurer un service sécurisé." },
+      q3: { q: "Et si le vendeur ne livre pas ?", a: "Si le vendeur ne livre pas, vous pouvez ouvrir un litige et notre équipe vous remboursera après vérification." }
     },
     history: {
       header: "Historique",
-      count_label: "transactions terminées",
-      single_count_label: "transaction terminée",
-      no_history: "Aucun historique",
-      history_desc: "Les deals terminés apparaîtront ici",
+      transactions: "Transactions",
+      empty: "Aucun historique pour le moment",
       bought: "Acheté",
       sold: "Vendu"
+    },
+    sidebar: {
+      dashboard: "Tableau de Bord",
+      dashboard_sub: "Aperçu & stats",
+      my_deals: "Mes Deals",
+      my_deals_sub: "Deals actifs & en attente",
+      new_deal: "Nouveau Deal",
+      new_deal_sub: "Créer une transaction",
+      dispute: "Litiges",
+      dispute_sub: "Signaler un problème",
+      history: "Historique",
+      history_sub: "Transactions passées",
+      support: "Support",
+      support_sub: "Aide & Contact",
+      how_it_works: "Comment ça marche",
+      how_it_works_sub: "Apprendre sur le séquestre",
+      settings: "Paramètres",
+      settings_sub: "Préférences du compte",
+      our_bots: "Nos Bots",
+      market_sub: "Acheter & vendre sur Telegram"
+    },
+    footer: {
+      powered: "Propulsé par"
     },
     rating: {
       header: "Votre Avis",
@@ -414,6 +487,12 @@ const translations = {
       placeholder: "Laissez un commentaire (optionnel)",
       submit: "Envoyer",
       skip: "Passer"
+    },
+    notifications: {
+      header: "Notifications",
+      mark_all: "Tout marquer comme lu",
+      empty: "Aucune notification",
+      empty_desc: "Les mises à jour s'afficheront ici"
     }
   }
 };
@@ -472,6 +551,8 @@ export default function MiniAppPage() {
   const [activeListingId, setActiveListingId] = useState<string | null>(null);
   const [marketAds, setMarketAds] = useState<{ id: string; title: string; description: string | null; image_path: string | null; video_path: string | null; link_url: string | null; image_paths?: string[] | null }[]>([]);
   const [activeAdImageIdx, setActiveAdImageIdx] = useState(0);
+  const [selectedAd, setSelectedAd] = useState<any>(null);
+  const [showAdModal, setShowAdModal] = useState(false);
   const [language, setLanguageState] = useState<Language>((localStorage.getItem("escrow_lang") as Language) || "en");
   const [notifSettings, setNotifSettings] = useState({
     transactions: localStorage.getItem("escrow_notif_transactions") !== "false",
@@ -512,7 +593,7 @@ export default function MiniAppPage() {
         });
 
         // Handle deep link (start_param)
-        const startParam = webApp.initDataUnsafe.start_param;
+        const startParam = (webApp.initDataUnsafe as any).start_param;
         if (startParam && startParam.startsWith('escrow_')) {
           const listingId = startParam.replace('escrow_', '');
           fetchMarketListing(listingId);
@@ -1212,7 +1293,7 @@ export default function MiniAppPage() {
     <div className="py-4 mt-6 pb-24 text-center">
       <div className={`flex items-center justify-center gap-1.5 text-[11px] ${textSecondary}`}>
         <Zap className="w-3 h-3" style={{ color: isDark ? "hsl(224,71%,60%)" : "hsl(224,71%,50%)" }} />
-        <span>Powered by <strong className={textPrimary} style={{ fontWeight: 600 }}>LightOrb Innovations</strong></span>
+        <span>{t.footer.powered} <strong className={textPrimary} style={{ fontWeight: 600 }}>LightOrb Innovations</strong></span>
       </div>
     </div>
   );
@@ -1223,7 +1304,7 @@ export default function MiniAppPage() {
       { id: "home" as View, label: "Home", icon: Home },
       { id: "my-deals" as View, label: "Deals", icon: List },
       { id: "new-deal" as View, label: "New", icon: Plus, isCenter: true },
-      { id: "history" as View, label: "History", icon: History },
+      { id: "history" as View, label: "History", icon: HistoryIcon },
       { id: "settings" as View, label: "Profile", icon: User },
     ];
     return (
@@ -1289,7 +1370,7 @@ export default function MiniAppPage() {
         <div className={`flex items-center justify-between px-5 py-4 border-b ${cardBorder} ${isDark ? "bg-[#1c1c1e]" : "bg-white"}`}>
           <div className="flex items-center gap-2">
             <Bell className={`w-5 h-5 ${isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]"}`} />
-            <h3 className="font-bold text-[16px]">Notifications</h3>
+            <h3 className="font-bold text-[16px]">{t.notifications.header}</h3>
             {notifications.length > 0 && (
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${isDark ? "bg-white/10 text-white/50" : "bg-black/[0.06] text-black/40"}`}>{notifications.length}</span>
             )}
@@ -1297,7 +1378,7 @@ export default function MiniAppPage() {
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
               <button onClick={markAllAsRead} className={`press-effect text-[12px] font-semibold px-3 py-1.5 rounded-lg ${isDark ? "text-[hsl(224,71%,60%)] bg-[hsl(224,71%,50%)]/10" : "text-[hsl(224,71%,50%)] bg-[hsl(224,71%,50%)]/10"}`}>
-                Mark all as read
+                {t.notifications.mark_all}
               </button>
             )}
             <button onClick={() => setNotifPanelOpen(false)} className="press-effect p-1.5">
@@ -1312,8 +1393,8 @@ export default function MiniAppPage() {
           ) : notifications.length === 0 ? (
             <div className="text-center py-16">
               <Bell className={`w-10 h-10 mx-auto mb-3 ${textSecondary}`} />
-              <p className={`text-[14px] font-medium ${textSecondary}`}>No notifications yet</p>
-              <p className={`text-[12px] mt-1 ${textSecondary}`}>You'll see deal updates here</p>
+              <p className={`text-[14px] font-medium ${textSecondary}`}>{t.notifications.empty}</p>
+              <p className={`text-[12px] mt-1 ${textSecondary}`}>{t.notifications.empty_desc}</p>
             </div>
           ) : (
             notifications.map((n) => (
@@ -1345,14 +1426,14 @@ export default function MiniAppPage() {
 
   // Sidebar navigation items
   const sidebarItems = [
-    { id: "home" as View, label: "Dashboard", subtitle: "Overview & stats", icon: Home, color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
-    { id: "my-deals" as View, label: "My Deals", subtitle: "Active & pending deals", icon: List, color: "from-emerald-500 to-emerald-600", badge: totalPendingActions },
-    { id: "new-deal" as View, label: "New Deal", subtitle: "Create escrow transaction", icon: Plus, color: "from-blue-500 to-blue-600" },
-    { id: "raise-dispute" as View, label: "Raise Dispute", subtitle: "Report an issue", icon: AlertTriangle, color: "from-red-400 to-red-500", badge: disputedDeals },
-    { id: "history" as View, label: "History", subtitle: "Past transactions", icon: History, color: "from-purple-500 to-purple-600" },
-    { id: "contact" as View, label: "Contact Support", subtitle: "Get help from us", icon: Phone, color: "from-teal-500 to-teal-600" },
-    { id: "faq" as View, label: "How It Works", subtitle: "Learn about escrow", icon: HelpCircle, color: "from-amber-500 to-amber-600" },
-    { id: "settings" as View, label: "Settings", subtitle: "Account preferences", icon: Settings, color: "from-gray-500 to-gray-600" },
+    { id: "home" as View, label: t.sidebar.dashboard, subtitle: t.sidebar.dashboard_sub, icon: Home, color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
+    { id: "my-deals" as View, label: t.sidebar.my_deals, subtitle: t.sidebar.my_deals_sub, icon: List, color: "from-emerald-500 to-emerald-600", badge: deals.filter(d => d.status === 'pending').length },
+    { id: "new-deal" as View, label: t.sidebar.new_deal, subtitle: t.sidebar.new_deal_sub, icon: Plus, color: "from-blue-500 to-blue-600" },
+    { id: "raise-dispute" as View, label: t.sidebar.dispute, subtitle: t.sidebar.dispute_sub, icon: AlertTriangle, color: "from-red-400 to-red-500", badge: deals.filter(d => d.status === 'disputed').length },
+    { id: "history" as View, label: t.sidebar.history, subtitle: t.sidebar.history_sub, icon: HistoryIcon, color: "from-purple-500 to-purple-600" },
+    { id: "contact" as View, label: t.sidebar.support, subtitle: t.sidebar.support_sub, icon: Phone, color: "from-teal-500 to-teal-600" },
+    { id: "faq" as View, label: t.sidebar.how_it_works, subtitle: t.sidebar.how_it_works_sub, icon: HelpCircle, color: "from-amber-500 to-amber-600" },
+    { id: "settings" as View, label: t.sidebar.settings, subtitle: t.sidebar.settings_sub, icon: Settings, color: "from-gray-500 to-gray-600" },
   ];
 
   // ===== LOADING STATE =====
@@ -1360,7 +1441,7 @@ export default function MiniAppPage() {
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} flex flex-col items-center justify-center p-6 gap-4`}>
         <Loader2 className="w-10 h-10 animate-spin text-[hsl(224,71%,50%)]" />
-        <p className={`text-sm ${textSecondary} animate-pulse`}>Loading TrustPay9ja...</p>
+        <p className={`text-sm ${textSecondary} animate-pulse`}>{t.common.loading}</p>
       </div>
     );
   }
@@ -1466,7 +1547,7 @@ export default function MiniAppPage() {
 
           {/* Other Bots */}
           <div className={`mt-3 pt-3 border-t ${cardBorder}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider px-3 mb-2 ${textSecondary}`}>Our Bots</p>
+            <p className={`text-[10px] font-semibold uppercase tracking-wider px-3 mb-2 ${textSecondary}`}>{t.sidebar.our_bots}</p>
             <a href="https://t.me/TrustPayMarketsBot" target="_blank" rel="noopener noreferrer"
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[14px] font-medium press-effect transition-all ${isDark ? "text-white/60 hover:bg-white/5" : "text-black/50 hover:bg-black/[0.03]"}`}>
               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center flex-shrink-0">
@@ -1474,7 +1555,7 @@ export default function MiniAppPage() {
               </div>
               <div className="flex-1 text-left">
                 <span className="block leading-tight">TrustPay Markets</span>
-                <span className={`block text-[11px] font-normal ${isDark ? "text-white/35" : "text-black/35"}`}>Buy & sell on Telegram</span>
+                <span className={`block text-[11px] font-normal ${isDark ? "text-white/35" : "text-black/35"}`}>{t.sidebar.market_sub}</span>
               </div>
               <ChevronRight className={`w-4 h-4 ${isDark ? "text-white/20" : "text-black/15"}`} />
             </a>
@@ -1483,7 +1564,7 @@ export default function MiniAppPage() {
 
         {/* Footer */}
         <div className={`px-5 py-3 border-t ${cardBorder}`}>
-          <p className={`text-[10px] text-center ${textSecondary}`}>Powered by LightOrb Innovations</p>
+          <p className={`text-[10px] text-center ${textSecondary}`}>{t.footer.powered} LightOrb Innovations</p>
         </div>
       </div>
     </div>
@@ -1494,8 +1575,8 @@ export default function MiniAppPage() {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-black/50" onClick={() => setShowRatingModal(false)} />
       <div className={`relative ${cardBg} border ${cardBorder} rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up`}>
-        <h3 className="text-[18px] font-bold text-center mb-1">Rate Your Experience</h3>
-        <p className={`text-[13px] text-center ${textSecondary} mb-4`}>How was this transaction?</p>
+        <h3 className="text-[18px] font-bold text-center mb-1">{t.rating.header}</h3>
+        <p className={`text-[13px] text-center ${textSecondary} mb-4`}>{t.rating.desc}</p>
         <div className="flex justify-center gap-2 mb-4">
           {[1, 2, 3, 4, 5].map(v => (
             <button key={v} onClick={() => { setRatingValue(v); webApp?.HapticFeedback?.impactOccurred("light"); }}
@@ -1504,17 +1585,79 @@ export default function MiniAppPage() {
             </button>
           ))}
         </div>
-        <input value={ratingComment} onChange={e => setRatingComment(e.target.value)} placeholder="Leave a comment (optional)"
+        <input value={ratingComment} onChange={e => setRatingComment(e.target.value)} placeholder={t.rating.placeholder}
           className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg} mb-3`} maxLength={200} />
         <button onClick={handleSubmitRating} disabled={ratingValue < 1 || ratingSubmitting}
           className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-3 rounded-xl text-[14px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25">
           {ratingSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-          Submit Rating
+          {t.rating.submit}
         </button>
-        <button onClick={() => setShowRatingModal(false)} className={`w-full mt-2 py-2 text-[13px] font-medium ${textSecondary}`}>Skip</button>
+        <button onClick={() => setShowRatingModal(false)} className={`w-full mt-2 py-2 text-[13px] font-medium ${textSecondary}`}>{t.rating.skip}</button>
       </div>
     </div>
   ) : null;
+
+  // Ad Modal Component
+  const AdModal = () => {
+    if (!showAdModal || !selectedAd) return null;
+
+    const displayImage = selectedAd.image_paths?.[0] || selectedAd.image_path || (selectedAd.image_paths && selectedAd.image_paths.length > 0 ? selectedAd.image_paths[0] : null);
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowAdModal(false)}>
+        <div className={`${cardBg} w-full max-w-sm rounded-[28px] overflow-hidden shadow-2xl animate-scale-in border ${cardBorder}`} onClick={e => e.stopPropagation()}>
+          <div className="relative h-56 bg-black/5">
+            {displayImage ? (
+              <img src={displayImage} alt={selectedAd.title} className="w-full h-full object-cover" />
+            ) : selectedAd.video_path ? (
+              <video src={selectedAd.video_path} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Sparkles className={`w-12 h-12 ${isDark ? "text-white/10" : "text-black/5"}`} />
+              </div>
+            )}
+            <button onClick={() => setShowAdModal(false)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center backdrop-blur-md press-effect">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="absolute top-3 left-3 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-lg">Sponsored</div>
+          </div>
+
+          <div className="p-5">
+            <h3 className="text-lg font-bold leading-tight">{selectedAd.title}</h3>
+            {selectedAd.description && (
+              <p className={`mt-2 text-[13px] leading-relaxed ${textSecondary}`}>{selectedAd.description}</p>
+            )}
+
+            <div className={`mt-5 p-3 rounded-2xl flex items-center gap-3 ${isDark ? "bg-white/5" : "bg-black/5"}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-600"}`}>
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">ADVERTISER</p>
+                <p className="text-[13px] font-medium">Verified Partner</p>
+              </div>
+              <ShieldCheck className="w-4 h-4 text-emerald-500 ml-auto" />
+            </div>
+
+            <button
+              onClick={() => {
+                const initData = webApp?.initData;
+                marketSupabase.functions.invoke('market-actions', {
+                  body: { action: 'track_ad_click', payload: { id: selectedAd.id } },
+                  headers: initData ? { 'x-telegram-init-data': initData } : {}
+                }).catch(() => { });
+                if (selectedAd.link_url) window.open(selectedAd.link_url, "_blank");
+                setShowAdModal(false);
+              }}
+              className="w-full mt-6 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-4 rounded-2xl text-[15px] shadow-lg shadow-amber-500/25 press-effect flex items-center justify-center gap-2"
+            >
+              Open Link <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Fixed Header — styled like TrustPay Markets
   const Header = ({ title, showBack = true, backTo = "home" as View }: { title?: string; showBack?: boolean; backTo?: View }) => (
@@ -1561,6 +1704,14 @@ export default function MiniAppPage() {
       { label: t.home.sells, value: completedSells, icon: <Store className="w-4 h-4" />, color: "from-emerald-500 to-emerald-600" },
       { label: "Spent", value: `₦${totalSpent.toLocaleString()}`, icon: <ArrowUpRight className="w-4 h-4" />, color: "from-red-400 to-red-500" },
       { label: "Earned", value: `₦${totalEarned.toLocaleString()}`, icon: <ArrowDownLeft className="w-4 h-4" />, color: "from-emerald-400 to-teal-500" },
+      { label: t.home.total_transactions, value: allUserDeals.length, icon: <Package className="w-4 h-4" />, color: "from-blue-500 to-blue-600" },
+      { label: t.home.active_deals, value: homeDeals.length, icon: <Clock className="w-4 h-4" />, color: "from-amber-500 to-amber-600" }
+    ];
+
+    // AVG Rating
+    const statCards_ext = [
+      ...statCards,
+      { label: "Rating", value: avgRating, icon: <Star className="w-4 h-4" />, color: "from-emerald-500 to-emerald-600" }
     ];
 
     return (
@@ -1569,6 +1720,8 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header />
           {/* Greeting */}
           <div className="pt-4 pb-2 px-5">
@@ -1635,13 +1788,14 @@ export default function MiniAppPage() {
                 ))}
               </div>
             </StaggerItem>
+
             {/* Dashboard Stats */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-2 gap-3 mb-6 mt-4">
               {[
-                { label: t.home.buys, value: stats.buyer, icon: <ShoppingCart className="w-5 h-5 text-blue-500" />, bg: "bg-blue-500/10", border: "border-blue-500/20" },
-                { label: t.home.sells, value: stats.seller, icon: <Store className="w-5 h-5 text-emerald-500" />, bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-                { label: t.home.active_deals, value: deals.filter(d => ["pending", "accepted", "funded"].includes(d.status)).length, icon: <Clock className="w-5 h-5 text-amber-500" />, bg: "bg-amber-500/10", border: "border-amber-500/20" },
-                { label: t.home.disputes, value: stats.disputed, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, bg: "bg-red-500/10", border: "border-red-500/20" },
+                { label: t.home.buys, value: completedBuys, icon: <ShoppingCart className="w-5 h-5 text-blue-500" />, bg: "bg-blue-500/10", border: "border-blue-500/20" },
+                { label: t.home.sells, value: completedSells, icon: <Store className="w-5 h-5 text-emerald-500" />, bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
+                { label: t.home.active_deals, value: activeBuyDeals + activeSellDeals, icon: <Clock className="w-5 h-5 text-amber-500" />, bg: "bg-amber-500/10", border: "border-amber-500/20" },
+                { label: t.home.disputes, value: disputedDeals, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, bg: "bg-red-500/10", border: "border-red-500/20" },
               ].map((stat, i) => (
                 <StaggerItem key={i} index={i + 1}>
                   <div className={`${cardBg} border ${cardBorder} p-4 rounded-2xl shadow-sm relative overflow-hidden group`}>
@@ -1659,7 +1813,7 @@ export default function MiniAppPage() {
             </div>
 
             {/* Pending Attention */}
-            {pendingActions.length > 0 && (
+            {totalPendingActions > 0 && (
               <StaggerItem index={5}>
                 <button onClick={() => navigate("my-deals")}
                   className={`w-full mb-6 p-4 rounded-2xl border flex items-center gap-4 press-effect shadow-sm transition-all ${isDark ? "bg-amber-500/10 border-amber-500/30 text-amber-400" : "bg-amber-50 border-amber-200 text-amber-700"
@@ -1668,83 +1822,84 @@ export default function MiniAppPage() {
                     <Bell className="w-6 h-6 badge-pulse" />
                   </div>
                   <div className="text-left flex-1 min-w-0">
-                    <p className="font-bold text-[15px] leading-tight">{pendingActions.length} {pendingActions.length === 1 ? t.home.pending_attention_single : t.home.pending_attention}</p>
+                    <p className="font-bold text-[15px] leading-tight">{totalPendingActions} {totalPendingActions === 1 ? t.home.pending_attention_single : t.home.pending_attention}</p>
                     <p className="text-[12px] opacity-80 mt-0.5 truncate">{t.home.view_all} →</p>
                   </div>
                   <ChevronRight className="w-5 h-5 opacity-40" />
                 </button>
               </StaggerItem>
             )}
+          </div>
 
-            {/* Quick Actions */}
-            <div className="px-4 space-y-2.5 mb-4">
-              <StaggerItem index={4}>
-                <button onClick={() => navigate("new-deal")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm`}>
-                  <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-md shadow-[hsl(224,71%,40%)/0.2]">
-                    <Plus className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <p className="font-semibold text-[15px]">{t.home.create_btn}</p>
-                    <p className={`text-[13px] mt-0.5 ${textSecondary}`}>Create a secure escrow transaction</p>
-                  </div>
-                  <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
-                </button>
-              </StaggerItem>
-              <StaggerItem index={5}>
-                <button onClick={() => navigate("my-deals")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm relative`}>
-                  <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
-                    <List className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="text-left flex-1">
-                    <p className="font-semibold text-[15px]">My Deals</p>
-                    <p className={`text-[13px] mt-0.5 ${textSecondary}`}>View deals as buyer or seller</p>
-                  </div>
-                  {totalPendingActions > 0 && (
-                    <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center badge-pulse">{totalPendingActions}</span>
-                  )}
-                  <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
-                </button>
-              </StaggerItem>
-            </div>
-
-            {/* Market Sponsored Ad */}
-            {marketAds.length > 0 && (() => {
-              const ad = marketAds[0];
-              const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
-              const displayImage = images[activeAdImageIdx % images.length];
-
-              // Analytics Tracking Hooks (within component)
-              // We use a simple ref-based check to track impression once
-              return <AdSection ad={ad} displayImage={displayImage} isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} textSecondary={textSecondary} />;
-            })()}
-
-            {/* How it works mini */}
-            <div className="px-4 pb-8">
-              <StaggerItem index={6}>
-                <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
-                    <h3 className="font-semibold text-[14px]">{t.home.how_it_works}</h3>
-                  </div>
-                  <div className="space-y-2.5">
-                    {[
-                      { step: "1", text: "Buyer creates deal → Seller accepts", color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
-                      { step: "2", text: "Buyer pays → Funds held in escrow", color: "from-amber-500 to-amber-600" },
-                      { step: "3", text: "Seller delivers → Buyer confirms → Payout!", color: "from-emerald-500 to-emerald-600" },
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{item.step}</div>
-                        <p className={`text-[12px] leading-snug ${isDark ? "text-white/60" : "text-black/50"}`}>{item.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={() => navigate("faq")} className={`text-[12px] font-medium mt-3 ${isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]"}`}>
-                    {t.home.learn_more} →
-                  </button>
+          {/* Quick Actions */}
+          <div className="px-4 space-y-2.5 mb-4">
+            <StaggerItem index={4}>
+              <button onClick={() => navigate("new-deal")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm`}>
+                <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-md shadow-[hsl(224,71%,40%)/0.2]">
+                  <Plus className="w-6 h-6 text-white" />
                 </div>
-              </StaggerItem>
-            </div>
-            <MiniFooter />
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-[15px]">{t.home.create_btn}</p>
+                  <p className={`text-[13px] mt-0.5 ${textSecondary}`}>Create a secure escrow transaction</p>
+                </div>
+                <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
+              </button>
+            </StaggerItem>
+            <StaggerItem index={5}>
+              <button onClick={() => navigate("my-deals")} className={`${cardBg} border ${cardBorder} w-full p-4 rounded-2xl flex items-center gap-4 press-effect shadow-sm relative`}>
+                <div className="w-12 h-12 rounded-[14px] bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-md shadow-emerald-500/20">
+                  <List className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-[15px]">My Deals</p>
+                  <p className={`text-[13px] mt-0.5 ${textSecondary}`}>View deals as buyer or seller</p>
+                </div>
+                {totalPendingActions > 0 && (
+                  <span className="absolute top-3 right-3 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center badge-pulse">{totalPendingActions}</span>
+                )}
+                <ChevronRight className={`w-5 h-5 ${textSecondary}`} />
+              </button>
+            </StaggerItem>
+          </div>
+
+          {/* Market Sponsored Ad */}
+          {marketAds.length > 0 && (() => {
+            const ad = marketAds[0];
+            const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
+            const displayImage = images[activeAdImageIdx % images.length];
+
+            // Analytics Tracking Hooks (within component)
+            // We use a simple ref-based check to track impression once
+            return <AdSection ad={ad} displayImage={displayImage} isDark={isDark} cardBg={cardBg} cardBorder={cardBorder} textSecondary={textSecondary} setSelectedAd={setSelectedAd} setShowAdModal={setShowAdModal} />;
+          })()}
+
+          {/* How it works mini */}
+          <div className="px-4 pb-8">
+            <StaggerItem index={6}>
+              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className={`w-4 h-4 ${isDark ? "text-amber-400" : "text-amber-500"}`} />
+                  <h3 className="font-semibold text-[14px]">{t.home.how_it_works}</h3>
+                </div>
+                <div className="space-y-2.5">
+                  {[
+                    { step: "1", text: "Buyer creates deal → Seller accepts", color: "from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)]" },
+                    { step: "2", text: "Buyer pays → Funds held in escrow", color: "from-amber-500 to-amber-600" },
+                    { step: "3", text: "Seller delivers → Buyer confirms → Payout!", color: "from-emerald-500 to-emerald-600" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-full bg-gradient-to-br ${item.color} flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0`}>{item.step}</div>
+                      <p className={`text-[12px] leading-snug ${isDark ? "text-white/60" : "text-black/50"}`}>{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => navigate("faq")} className={`text-[12px] font-medium mt-3 ${isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]"}`}>
+                  {t.home.learn_more} →
+                </button>
+              </div>
+            </StaggerItem>
+          </div>
+          <MiniFooter />
         </PageTransition>
         <BottomNav />
       </div>
@@ -1762,6 +1917,8 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.dispute.header} />
           <div className="px-4 pb-8">
             {disputeSuccess ? (
@@ -1814,9 +1971,9 @@ export default function MiniAppPage() {
                     </div>
                   </div>
 
-                  <button onClick={handleSubmitDispute} disabled={submittingDispute || !disputeDealId || !disputeReason}
+                  <button onClick={handleSubmitDispute} disabled={disputeSubmitting || !disputeDealId || !disputeReason}
                     className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-500/25">
-                    {submittingDispute ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
+                    {disputeSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4" />}
                     {t.dispute.submit_btn}
                   </button>
                 </div>
@@ -1856,15 +2013,17 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.contact.header} />
-          <div className="px-4 pb-8 space-y-4">
+          <div className="px-5 py-6">
             <StaggerItem index={0}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-6 text-center shadow-sm`}>
-                <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-                  <Headset className="w-8 h-8 text-blue-500" />
+              <div className={`${cardBg} border ${cardBorder} rounded-3xl p-6 text-center shadow-sm mb-6`}>
+                <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                  <Headset className="w-8 h-8 text-emerald-500" />
                 </div>
                 <h3 className="text-xl font-bold mb-2">{t.contact.header}</h3>
-                <p className={`text-[14px] ${textSecondary}`}>
+                <p className={`text-[14px] leading-relaxed ${textSecondary}`}>
                   {t.contact.desc}
                 </p>
               </div>
@@ -1882,7 +2041,7 @@ export default function MiniAppPage() {
                     <div className={`w-12 h-12 rounded-xl ${item.color} flex items-center justify-center text-white shadow-lg shadow-${item.color.split('-')[1]}-500/20 group-hover:scale-110 transition-transform`}>
                       {item.icon}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 text-left">
                       <p className={`text-[12px] font-bold uppercase tracking-wider mb-0.5 ${textSecondary}`}>{item.label}</p>
                       <p className="font-bold text-[15px] truncate">{item.value}</p>
                     </div>
@@ -1918,20 +2077,25 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.faq.header} />
-          <div className="px-4 pb-8 space-y-6">
+          <div className="px-5 py-6">
             <StaggerItem index={0}>
-              <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm`}>
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                  {t.faq.how_it_works}
-                </h3>
+              <div className={`${cardBg} border ${cardBorder} rounded-3xl p-6 shadow-sm mb-6`}>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold">{t.faq.how_it_works}</h3>
+                </div>
                 <div className="space-y-6">
                   {[
                     { step: "1", title: t.faq.steps.create_title, desc: t.faq.steps.create_desc },
-                    { step: "2", title: t.faq.steps.fund_title, desc: t.faq.steps.fund_desc },
-                    { step: "3", title: t.faq.steps.delivery_title, desc: t.faq.steps.delivery_desc },
-                    { step: "4", title: t.faq.steps.release_title, desc: t.faq.steps.release_desc },
+                    { step: "2", title: t.faq.steps.accept_title, desc: t.faq.steps.accept_desc },
+                    { step: "3", title: t.faq.steps.pay_title, desc: t.faq.steps.pay_desc },
+                    { step: "4", title: t.faq.steps.deliver_title, desc: t.faq.steps.deliver_desc },
+                    { step: "5", title: t.faq.steps.confirm_title, desc: t.faq.steps.confirm_desc },
                   ].map((s, i) => (
                     <div key={i} className="flex gap-4">
                       <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
@@ -1947,30 +2111,23 @@ export default function MiniAppPage() {
               </div>
             </StaggerItem>
 
-            <StaggerItem index={1}>
-              <div className="space-y-3">
-                <h3 className={`text-[12px] font-bold uppercase tracking-wider mb-3 px-1 ${textSecondary}`}>{t.faq.questions_header}</h3>
-                {[
-                  {
-                    q: t.faq.q1.q,
-                    a: t.faq.q1.a
-                  },
-                  {
-                    q: t.faq.q2.q,
-                    a: t.faq.q2.a
-                  },
-                  {
-                    q: t.faq.q3.q,
-                    a: t.faq.q3.a
-                  }
-                ].map((item, i) => (
-                  <div key={i} className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
-                    <h4 className="font-bold text-[14px] mb-2">{item.q}</h4>
-                    <p className={`text-[13px] leading-relaxed ${textSecondary}`}>{item.a}</p>
+            {/* FAQ List */}
+            <div className="space-y-4">
+              <h3 className={`text-[12px] font-bold uppercase tracking-wider px-1 mb-3 ${textSecondary}`}>{t.faq.questions_header}</h3>
+
+              {[
+                { q: t.faq.q1.q, a: t.faq.q1.a },
+                { q: t.faq.q2.q, a: t.faq.q2.a },
+                { q: t.faq.q3.q, a: t.faq.q3.a },
+              ].map((faq, i) => (
+                <StaggerItem key={i} index={i + 1}>
+                  <div className={`${cardBg} border ${cardBorder} rounded-2xl p-4 shadow-sm`}>
+                    <h4 className="font-bold text-[14px] mb-2">{faq.q}</h4>
+                    <p className={`text-[13px] leading-relaxed ${textSecondary}`}>{faq.a}</p>
                   </div>
-                ))}
-              </div>
-            </StaggerItem>
+                </StaggerItem>
+              ))}
+            </div>
           </div>
           <MiniFooter />
         </PageTransition>
@@ -1989,6 +2146,8 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.history.header} />
           <div className="px-4 pb-8">
             <StaggerItem index={0}>
@@ -2016,7 +2175,7 @@ export default function MiniAppPage() {
               <div className="space-y-3">
                 <h3 className={`text-[12px] font-bold uppercase tracking-wider mb-3 px-1 ${textSecondary}`}>{t.history.header}</h3>
                 {completedDeals.map((d, i) => {
-                  const isBuyer = d.buyer_telegram_id === tgUser?.id;
+                  const isBuyer = usernameMatch(d.buyer_telegram, uname);
                   const statusColors = {
                     completed: "text-emerald-500",
                     cancelled: "text-gray-500",
@@ -2070,7 +2229,9 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
-          <Header title="Settings" />
+          <RatingModal />
+          <AdModal />
+          <Header title={t.settings.header} />
           <div className="px-4 pb-8">
             {/* Profile Card */}
             <StaggerItem index={0}>
@@ -2098,11 +2259,11 @@ export default function MiniAppPage() {
                 <div className={`h-px ${isDark ? "bg-white/5" : "bg-black/[0.04]"} mb-4`} />
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className={`text-[13px] ${textSecondary}`}>Total deals</span>
+                    <span className={`text-[13px] ${textSecondary}`}>{t.settings.profile.total_deals}</span>
                     <span className="text-[13px] font-medium">{allUserDeals.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className={`text-[13px] ${textSecondary}`}>Completed</span>
+                    <span className={`text-[13px] ${textSecondary}`}>{t.settings.profile.completed}</span>
                     <span className="text-[13px] font-medium">{completedBuys + completedSells}</span>
                   </div>
                 </div>
@@ -2114,7 +2275,7 @@ export default function MiniAppPage() {
               <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mb-4`}>
                 <div className="flex items-center gap-2 mb-4">
                   <CreditCard className={`w-4 h-4 ${isDark ? "text-emerald-400" : "text-emerald-500"}`} />
-                  <h3 className="font-semibold text-[14px]">Bank Account</h3>
+                  <h3 className="font-semibold text-[14px]">{t.settings.bank.header}</h3>
                 </div>
                 {/* ... existing bank details fields ... */}
                 {profileLoading ? (
@@ -2124,27 +2285,27 @@ export default function MiniAppPage() {
                 ) : (
                   <div className="space-y-3">
                     <div>
-                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Bank Name</label>
+                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>{t.settings.bank.bank_name}</label>
                       <select value={bankName} onChange={(e) => setBankName(e.target.value)}
                         className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg} appearance-none`}>
-                        <option value="">Select bank...</option>
+                        <option value="">{t.settings.bank.select_bank}</option>
                         {BANKS.map(b => <option key={b} value={b}>{b}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Account Number</label>
+                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>{t.settings.bank.account_number}</label>
                       <input type="text" inputMode="numeric" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))} placeholder="0123456789"
                         className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg}`} maxLength={10} />
                     </div>
                     <div>
-                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>Account Name</label>
+                      <label className={`text-[12px] font-semibold uppercase tracking-wider mb-1.5 block ${textSecondary}`}>{t.settings.bank.account_name}</label>
                       <input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="John Doe"
                         className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg}`} maxLength={100} />
                     </div>
                     <button onClick={handleSaveProfile} disabled={savingProfile}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold py-3 rounded-xl text-[14px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 mt-1">
                       {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                      {savingProfile ? "Saving..." : "Save Bank Details"}
+                      {savingProfile ? t.common.loading : t.settings.bank.save_btn}
                     </button>
                   </div>
                 )}
@@ -2214,6 +2375,8 @@ export default function MiniAppPage() {
         <Sidebar />
         <NotificationsOverlay />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.new_deal.header} />
           <div className="px-4 pb-8">
             <p className={`text-[14px] mb-4 ${textSecondary}`}>{t.new_deal.buyer_hint}</p>
@@ -2291,8 +2454,9 @@ export default function MiniAppPage() {
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
-        <RatingModal />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.deals.header} />
           <div className="px-4 pb-8">
             <p className={`text-[14px] mb-4 ${textSecondary}`}>{deals.length} {deals.length !== 1 ? t.deals.header.toLowerCase() : t.deals.header.toLowerCase().replace(/s$/, "")}</p>
@@ -2367,8 +2531,9 @@ export default function MiniAppPage() {
         <style>{globalStyles}</style>
         <Sidebar />
         <NotificationsOverlay />
-        <RatingModal />
         <PageTransition direction={direction}>
+          <RatingModal />
+          <AdModal />
           <Header title={t.details.header} backTo="my-deals" />
           <div className="px-4 pb-8">
             <StaggerItem index={0}>
@@ -2623,7 +2788,7 @@ export default function MiniAppPage() {
 
   return null;
 }
-function AdSection({ ad, displayImage, isDark, cardBg, cardBorder, textSecondary }: any) {
+function AdSection({ ad, displayImage, isDark, cardBg, cardBorder, textSecondary, setSelectedAd, setShowAdModal }: any) {
   const tracked = useRef(false);
 
   useEffect(() => {
@@ -2638,31 +2803,39 @@ function AdSection({ ad, displayImage, isDark, cardBg, cardBorder, textSecondary
   }, [ad.id]);
 
   const onAdClick = () => {
-    const initData = window.Telegram?.WebApp?.initData;
-    marketSupabase.functions.invoke('market-actions', {
-      body: { action: 'track_ad_click', payload: { id: ad.id } },
-      headers: initData ? { 'x-telegram-init-data': initData } : {}
-    }).catch(() => { });
-    if (ad.link_url) window.open(ad.link_url, "_blank");
+    setSelectedAd(ad);
+    setShowAdModal(true);
   };
+
+  const AdIcon = Sparkles;
 
   return (
     <div className="px-4 mb-3">
       <StaggerItem index={6}>
         <div
-          className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm press-effect cursor-pointer`}
+          className={`${cardBg} border-2 animate-pulse-border ${cardBorder} rounded-2xl overflow-hidden shadow-md press-effect cursor-pointer group transition-all duration-300 hover:scale-[1.02]`}
           onClick={onAdClick}
         >
           {displayImage ? (
-            <img src={displayImage} alt={ad.title} className="w-full h-32 object-cover" loading="lazy" />
+            <img src={displayImage} alt={ad.title} className="w-full h-32 object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
           ) : ad.video_path ? (
             <video src={ad.video_path} className="w-full h-32 object-cover" muted autoPlay loop playsInline />
           ) : null}
-          <div className="p-3 flex items-start gap-3">
-            <div className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-600"}`}>Ad</div>
-            <div className="min-w-0">
-              <p className="font-semibold text-[13px] truncate">{ad.title}</p>
-              {ad.description && <p className={`text-[11px] mt-0.5 ${textSecondary} line-clamp-2`}>{ad.description}</p>}
+          <div className="p-3 flex items-start gap-3 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-1 opacity-10">
+              <AdIcon className="w-12 h-12" />
+            </div>
+            <div className={`shrink-0 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-tighter ${isDark ? "bg-gradient-to-br from-amber-400 to-orange-500 text-black" : "bg-gradient-to-br from-amber-500 to-orange-600 text-white"}`}>Ad</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-[14px] truncate leading-none">{ad.title}</p>
+                <div className="w-1 h-1 rounded-full bg-amber-500 flex-shrink-0" />
+                <span className={`text-[10px] font-medium ${isDark ? "text-amber-400/70" : "text-amber-600/70"}`}>Sponsored</span>
+              </div>
+              {ad.description && <p className={`text-[12px] mt-1 ${textSecondary} line-clamp-2 leading-snug`}>{ad.description}</p>}
+            </div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDark ? "bg-white/5" : "bg-black/5"} opacity-0 group-hover:opacity-100 transition-opacity`}>
+              <ExternalLink className="w-4 h-4" />
             </div>
           </div>
         </div>
