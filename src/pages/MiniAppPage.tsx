@@ -612,9 +612,20 @@ export default function MiniAppPage() {
     }
   }, []);
 
-  // Handle deep link (start_param) precisely
+  // Handle deep link (start_param) or token-based link
   useEffect(() => {
     if (!webApp || deepLinkHandled) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (token) {
+      console.log("Token detected in URL:", token);
+      setDeepLinkHandled(true);
+      validateEscrowToken(token);
+      return;
+    }
+
     const startParam = (webApp.initDataUnsafe as any).start_param;
     if (startParam && startParam.startsWith('escrow_')) {
       const listingId = startParam.replace('escrow_', '');
@@ -627,6 +638,50 @@ export default function MiniAppPage() {
       });
     }
   }, [tgUser, webApp, deepLinkHandled]);
+
+  const validateEscrowToken = async (token: string) => {
+    setLoading(true);
+    try {
+      // 1. Fetch token record from Market DB
+      const { data: tokenData, error: tokenError } = await marketSupabase
+        .from("escrow_tokens")
+        .select("*")
+        .eq("token", token)
+        .eq("used", false)
+        .single();
+
+      if (tokenError || !tokenData) {
+        console.error("Invalid or used token:", tokenError);
+        setError("This deal link is invalid or has already been used.");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Check expiration (5 mins)
+      const isExpired = new Date(tokenData.expires_at).getTime() < Date.now();
+      if (isExpired) {
+        console.error("Token expired");
+        setError("This deal link has expired. Please start the purchase again in the Market app.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Mark as used immediately to prevent race conditions or double-processing
+      await marketSupabase.from("escrow_tokens").update({ used: true }).eq("id", tokenData.id);
+
+      // 4. Fetch the listing
+      await fetchMarketListing(tokenData.listing_id);
+
+      console.log("Token validation success. Navigating to new-deal");
+      setDirection("forward");
+      setView("new-deal");
+    } catch (err) {
+      console.error("Token validation error:", err);
+      setError("Failed to validate deal token. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchMarketListing = async (listingId: string) => {
     setLoading(true);
