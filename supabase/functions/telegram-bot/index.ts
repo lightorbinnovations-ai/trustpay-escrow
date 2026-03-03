@@ -206,6 +206,63 @@ serve(async (req) => {
     if (text && text.startsWith("/start")) {
       const startParam = text.replace("/start", "").trim();
 
+      // ─── Marketplace handoff (New): /start nd_BASE64 ───
+      // Data format: @seller amount description
+      if (startParam.startsWith("nd_")) {
+        try {
+          const encoded = startParam.replace("nd_", "");
+          const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+          const decoded = atob(normalized);
+
+          // Format: @seller amount description|listingId
+          const [commandPart, dlListingId] = decoded.split("|");
+          const parts = commandPart.match(/^@(\S+)\s+(\d+)\s+(.+)$/);
+
+          if (!parts) {
+            await sendMessage(chatId, `❌ Invalid deal link format.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          const [, dlSeller, dlAmount, dlDescription] = parts;
+          const amt = parseInt(dlAmount);
+          const cleanSeller = dlSeller.replace(/^@/, "");
+
+          if (cleanSeller.toLowerCase() === username.toLowerCase()) {
+            await sendMessage(chatId, `❌ You cannot create a deal with yourself.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          const fee = Math.max(300, Math.round(amt * 0.05));
+          const sellerReceives = amt - fee;
+          const cleanDesc = sanitizeInput(dlDescription);
+
+          await sendMessage(chatId,
+            `🛒 <b>Escrow Deal Confirmation</b>\n${LINE}\n\n` +
+            `┌─────────────────────┐\n` +
+            `│ 📝 <b>${cleanDesc}</b>\n` +
+            `│ 👤 Seller: @${cleanSeller}\n│\n` +
+            `│ 💰 Amount:     ₦${amt.toLocaleString()}\n` +
+            `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+            `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
+            (dlListingId ? `│ 🏷️ Listing ID: ${dlListingId.substring(0, 8)}...\n` : "") +
+            `└─────────────────────┘\n\n` +
+            `👇 <b>Confirm to create this secure escrow deal:</b>\n${LINE}`,
+            {
+              inline_keyboard: [
+                // Reuse mkdeal handler: seller|amount|description|productId
+                [{ text: "✅ Confirm & Create Deal", callback_data: `mkdeal_${btoa(`${dlSeller}|${dlAmount}|${dlDescription}|${dlListingId || ""}`)}` }],
+                [{ text: "❌ Cancel", callback_data: "open_start" }],
+              ]
+            }
+          );
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        } catch (e) {
+          console.error("nd_ link parse error:", e);
+          await sendMessage(chatId, `❌ Invalid deal link.`, mainMenuKeyboard);
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        }
+      }
+
       // ─── Marketplace escrow: /start escrow_{listingId} ───
       if (startParam.startsWith("escrow_")) {
         const listingId = startParam.replace("escrow_", "");

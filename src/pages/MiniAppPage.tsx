@@ -1410,24 +1410,23 @@ export default function MiniAppPage() {
     ];
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-6 pointer-events-none">
-        <div className={`mx-6 w-full max-w-[400px] pointer-events-auto rounded-3xl ${isDark ? "bg-[#1c1c1e]/80 border-white/5" : "bg-white/80 border-black/[0.03]"} backdrop-blur-3xl border shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] px-1.5 py-1.5`}>
-          <div className="flex items-center">
+        <div className={`mx-4 w-full max-w-[420px] pointer-events-auto rounded-[2rem] ${isDark ? "bg-[#1c1c1e]/85 border-white/5" : "bg-white/80 border-black/[0.04]"} backdrop-blur-2xl border shadow-[0_8px_32px_rgba(0,0,0,0.15)] px-2 py-2`}>
+          <div className="flex items-center justify-around w-full">
             {navTabs.map((tab) => {
               const active = view === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => navigate(tab.id)}
-                  className={`relative flex flex-col items-center justify-center flex-1 transition-all duration-300 h-10`}
+                  className={`relative flex flex-col items-center justify-center flex-1 transition-all duration-300 h-12`}
                 >
-                  <div className={`flex items-center justify-center transition-all duration-300 ${active ? "opacity-100 scale-110" : "opacity-40 scale-100 hover:opacity-60"}`}>
-                    <tab.icon className={`w-5 h-5 ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white" : "text-black")}`} />
+                  <div className={`flex items-center justify-center transition-all duration-300 ${active ? "opacity-100 scale-110" : "opacity-40 scale-100 hover:opacity-75"}`}>
+                    <tab.icon className={`w-[22px] h-[22px] ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white" : "text-black")}`} />
                   </div>
                   {active && (
-                    <div className={`absolute -bottom-0.5 w-1 h-1 rounded-full ${isDark ? "bg-[hsl(224,71%,60%)]" : "bg-[hsl(224,71%,50%)]"}`} />
+                    <div className={`absolute bottom-1 w-1 h-1 rounded-full ${isDark ? "bg-[hsl(224,71%,60%)]" : "bg-[hsl(224,71%,50%)]"}`} />
                   )}
-                  {/* Subtle label only if active or very small fonts */}
-                  <span className={`text-[8px] font-bold mt-0.5 transition-all duration-300 ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"}`}>
+                  <span className={`text-[9px] font-bold mt-1 transition-all duration-300 ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1 block h-0 overflow-hidden"}`}>
                     {tab.label}
                   </span>
                 </button>
