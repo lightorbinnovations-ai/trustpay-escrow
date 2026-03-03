@@ -206,6 +206,85 @@ serve(async (req) => {
     if (text && text.startsWith("/start")) {
       const startParam = text.replace("/start", "").trim();
 
+      // ─── Marketplace handoff (Token-based): /start tok_TOKEN ───
+      if (startParam.startsWith("tok_")) {
+        try {
+          const token = startParam.replace("tok_", "");
+
+          // 1. Fetch token record from Market DB
+          const { data: tokenData, error: tokenError } = await marketSupabase
+            .from("escrow_tokens")
+            .select("*, listings(*)")
+            .eq("token", token)
+            .single();
+
+          if (tokenError || !tokenData) {
+            console.error("Token fetch error:", tokenError);
+            await sendMessage(chatId, `❌ Link expired or invalid. Please try again from the Market app.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          // 2. Check expiration
+          if (new Date(tokenData.expires_at).getTime() < Date.now()) {
+            await sendMessage(chatId, `❌ This deal link has expired.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          if (tokenData.used) {
+            await sendMessage(chatId, `❌ This deal link has already been used.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          const listing = tokenData.listings;
+          const amt = listing.price;
+          const dlDescription = listing.title;
+          const dlListingId = listing.id;
+
+          // 3. Fetch seller username
+          const { data: sellerData } = await marketSupabase
+            .from("bot_users")
+            .select("username")
+            .eq("telegram_id", listing.seller_telegram_id)
+            .single();
+
+          const dlSeller = sellerData?.username || `user_${listing.seller_telegram_id}`;
+          const cleanSeller = dlSeller.replace(/^@/, "");
+
+          if (cleanSeller.toLowerCase() === username.toLowerCase()) {
+            await sendMessage(chatId, `❌ You cannot create a deal with yourself.`, mainMenuKeyboard);
+            return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+          }
+
+          const fee = Math.max(300, Math.round(amt * 0.05));
+          const sellerReceives = amt - fee;
+          const cleanDesc = sanitizeInput(dlDescription);
+
+          await sendMessage(chatId,
+            `🛒 <b>Escrow Deal Confirmation</b>\n${LINE}\n\n` +
+            `┌─────────────────────┐\n` +
+            `│ 📝 <b>${cleanDesc}</b>\n` +
+            `│ 👤 Seller: @${cleanSeller}\n│\n` +
+            `│ 💰 Amount:     ₦${amt.toLocaleString()}\n` +
+            `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+            `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
+            `│ 🏷️ Listing ID: ${dlListingId.substring(0, 8)}...\n` +
+            `└─────────────────────┘\n\n` +
+            `👇 <b>Confirm to create this secure escrow deal:</b>\n${LINE}`,
+            {
+              inline_keyboard: [
+                [{ text: "✅ Confirm & Create Deal", callback_data: `mkdeal_${btoa(`${dlSeller}|${amt}|${dlDescription}|${dlListingId}|${tokenData.id}`)}` }],
+                [{ text: "❌ Cancel", callback_data: "open_start" }],
+              ]
+            }
+          );
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        } catch (e) {
+          console.error("tok_ link parse error:", e);
+          await sendMessage(chatId, `❌ Failed to process deal link.`, mainMenuKeyboard);
+          return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+        }
+      }
+
       // ─── Marketplace handoff (New): /start nd_BASE64 ───
       // Data format: @seller amount description
       if (startParam.startsWith("nd_")) {
@@ -714,10 +793,18 @@ serve(async (req) => {
 
       await supabase.from("audit_logs").insert([{
         deal_id: dealId, action: "deal_created", actor: `@${username}`,
-        details: { amount, seller: `@${sellerUsername}`, description },
+        details: { amount, seller: `@${sellerUsername}`, description, listing_id: dlListingId },
       }]);
 
+      // If created via token, mark token as used
+      if (tokenId) {
+        await marketSupabase.from("escrow_tokens").update({ used: true }).eq("id", tokenId);
+      }
+
       // ✅ Notify BUYER — deal created, waiting for seller to accept
+      const escrowBotHandle = "TrustPay9jaBot";
+      const miniAppLink = `https://t.me/${escrowBotHandle}/app?startapp=deal_${dealId}`;
+
       await sendMessage(chatId,
         `✅ <b>Deal Created!</b>\n${LINE}\n\n` +
         `┌─────────────────────┐\n` +
@@ -732,7 +819,12 @@ serve(async (req) => {
         `│ ${progressBar("pending")}\n` +
         `└─────────────────────┘\n\n` +
         `⏳ <b>Waiting for seller to accept this deal.</b>\nYou'll be notified once they accept so you can proceed to pay.`,
-        { inline_keyboard: [[{ text: "📋 My Deals", callback_data: "open_mydeals" }, { text: "🔙 Menu", callback_data: "open_start" }]] }
+        {
+          inline_keyboard: [
+            [{ text: "🚀 View Deal in App", url: miniAppLink }],
+            [{ text: "📋 My Deals", callback_data: "open_mydeals" }, { text: "🔙 Menu", callback_data: "open_start" }]
+          ]
+        }
       );
 
       // ✅ Notify SELLER — accept or decline
@@ -785,7 +877,8 @@ serve(async (req) => {
         try {
           const decoded = atob(encoded);
           const parts = decoded.split("|");
-          const [dlSeller, dlAmount, dlDescription, dlProductId] = parts;
+          const [dlSeller, dlAmount, dlDescription, dlProductId, tokenId] = parts;
+
           const cleanSeller = dlSeller.replace(/^@/, "");
           const amt = parseInt(dlAmount);
           const fee = Math.max(300, Math.round(amt * 0.05));
@@ -814,16 +907,22 @@ serve(async (req) => {
             amount: amt, fee, description: cleanDesc, status: "pending",
           });
           if (error) {
+            console.error("Deal creation error:", error);
             await sendMessage(callbackChatId, `❌ Failed to create deal. Please try again.`);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
+          // Mark token as used if applicable
+          if (tokenId) {
+            await marketSupabase.from("escrow_tokens").update({ used: true }).eq("id", tokenId);
+          }
+
           await supabase.from("audit_logs").insert([{
             deal_id: dealId, action: "deal_created", actor: `@${callbackUser}`,
-            details: { amount: amt, seller: `@${cleanSeller}`, description: cleanDesc, source: "marketplace" },
+            details: { amount: amt, seller: `@${cleanSeller}`, description: cleanDesc, source: "marketplace", listing_id: dlProductId },
           }]);
 
-          const escrowBot = "TrustPay9jaBot"; // Should be env var ideally
+          const escrowBot = "TrustPay9jaBot";
           const miniAppLink = `https://t.me/${escrowBot}/app?startapp=deal_${dealId}`;
 
           await sendMessage(callbackChatId,
