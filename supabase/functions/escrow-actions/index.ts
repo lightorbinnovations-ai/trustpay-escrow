@@ -8,6 +8,23 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const LINE = "━━━━━━━━━━━━━━━━━━━━━━";
+
+async function sendMessage(botToken: string, chatId: number, text: string, replyMarkup?: any) {
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+    }),
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -59,6 +76,53 @@ serve(async (req) => {
         }).select().single();
 
         if (error) throw error;
+
+        // --- Proactive Notifications ---
+        try {
+          const sellerReceives = amount - fee;
+          const miniAppLink = `https://t.me/TrustPay9jaBot/app?startapp=deal_${dealId}`;
+
+          // 1. Notify Buyer
+          await sendMessage(botToken, tgUser.id,
+            `🛒 <b>Escrow Deal Initiated!</b>\n${LINE}\n\n` +
+            `🆔 <code>${dealId}</code>\n` +
+            `📝 ${cleanDesc}\n` +
+            `👤 Seller: @${seller.replace("@", "")}\n\n` +
+            `💰 Amount: ₦${amount.toLocaleString()}\n` +
+            `💵 Fee (5%): ₦${fee.toLocaleString()}\n` +
+            `📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n\n` +
+            `⏳ <b>Waiting for seller to accept.</b>\nYou'll be notified when they are ready for payment.\n${LINE}`,
+            { inline_keyboard: [[{ text: "🚀 View in App", url: miniAppLink }]] }
+          );
+
+          // 2. Notify Seller
+          // Look up seller's chat ID (if they've used the bot before)
+          const { data: sellerProfile } = await supabaseClient
+            .from("bot_users")
+            .select("telegram_id")
+            .ilike("username", seller.replace("@", ""))
+            .maybeSingle();
+
+          if (sellerProfile?.telegram_id) {
+            await sendMessage(botToken, sellerProfile.telegram_id,
+              `📩 <b>New Escrow Request!</b>\n${LINE}\n\n` +
+              `🆔 <code>${dealId}</code>\n` +
+              `📝 ${cleanDesc}\n` +
+              `👤 Buyer: @${tgUser.username || "User"}\n\n` +
+              `💰 Amount: ₦${amount.toLocaleString()}\n` +
+              `📤 You'll receive: ₦${sellerReceives.toLocaleString()}\n\n` +
+              `👇 <b>Please accept or decline in the app:</b>\n${LINE}`,
+              {
+                inline_keyboard: [
+                  [{ text: "🚀 View in App", url: miniAppLink }],
+                ]
+              }
+            );
+          }
+        } catch (notifyErr) {
+          console.error("Proactive notification failed:", notifyErr);
+          // Don't fail the whole request if notification fails
+        }
 
         await supabaseClient.from("audit_logs").insert([{
           deal_id: dealId, action: "deal_created", actor: userTelegramTag,
