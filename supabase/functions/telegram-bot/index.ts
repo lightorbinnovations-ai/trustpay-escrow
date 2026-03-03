@@ -823,12 +823,20 @@ serve(async (req) => {
             details: { amount: amt, seller: `@${cleanSeller}`, description: cleanDesc, source: "marketplace" },
           }]);
 
+          const escrowBot = "TrustPay9jaBot"; // Should be env var ideally
+          const miniAppLink = `https://t.me/${escrowBot}/app?startapp=deal_${dealId}`;
+
           await sendMessage(callbackChatId,
             `✅ <b>Marketplace Deal Created!</b>\n${LINE}\n\n` +
             `🆔 <code>${dealId}</code>\n📝 ${cleanDesc}\n👤 Seller: @${cleanSeller}\n` +
             `💰 ₦${amt.toLocaleString()} · Fee: ₦${fee.toLocaleString()}\n\n` +
             `⏳ Waiting for seller to accept...\n${LINE}`,
-            { inline_keyboard: [[{ text: "📋 My Deals", callback_data: "open_mydeals" }]] }
+            {
+              inline_keyboard: [
+                [{ text: "🚀 View Deal in App", url: miniAppLink }],
+                [{ text: "📋 My Deals", callback_data: "open_mydeals" }]
+              ]
+            }
           );
 
           await notifyUser(`@${cleanSeller}`,

@@ -511,11 +511,11 @@ function StaggerItem({ children, index }: { children: React.ReactNode; index: nu
 export default function MiniAppPage() {
   const [view, setViewOriginal] = useState<View>(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("listing_id") || params.get("token")) {
+    if (params.get("listing_id") || params.get("token") || params.get("deal_id")) {
       return "loading";
     }
     const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
-    if (startParam?.startsWith("escrow_")) {
+    if (startParam?.startsWith("escrow_") || startParam?.startsWith("deal_") || startParam?.startsWith("nd_")) {
       return "loading";
     }
     return "home";
@@ -644,15 +644,38 @@ export default function MiniAppPage() {
     }
 
     const startParam = (webApp.initDataUnsafe as any).start_param;
+
+    // 1. Handle deal_ direct link (Escrow App specific)
+    if (startParam && startParam.startsWith('deal_')) {
+      const dealId = startParam.replace('deal_', '');
+      console.log("Direct deal link detected:", dealId);
+      setDeepLinkHandled(true);
+      fetchDealById(dealId).then(() => {
+        setDirection("forward");
+        setView("deal-detail");
+      });
+      return;
+    }
+
+    // 2. Handle escrow_ marketplace link
     if (startParam && startParam.startsWith('escrow_')) {
       const listingId = startParam.replace('escrow_', '');
       console.log("Deep link detected via start_param:", listingId);
       setDeepLinkHandled(true);
       fetchMarketListing(listingId).then(() => {
-        console.log("Navigating to new-deal via start_param");
         setDirection("forward");
         setView("new-deal");
       });
+      return;
+    }
+
+    // 3. Handle nd_ marketplace handoff
+    if (startParam && startParam.startsWith('nd_')) {
+      // This is typically handled by the bot sending a confirmation card,
+      // but if the user opens the app directly with this param, we show loading then home.
+      setDeepLinkHandled(true);
+      setView("home");
+      return;
     }
   }, [tgUser, webApp, deepLinkHandled]);
 
@@ -735,12 +758,35 @@ export default function MiniAppPage() {
 
       // 2. Clear flags and navigate
       setSuccessDeal(null);
-      setError("");
-      setDirection("forward");
-      setView("new-deal");
-      webApp?.HapticFeedback?.notificationOccurred("success");
+      setAmount(listing.price.toString());
+      setDescription(listing.title);
+      setActiveListingId(listing.id);
+      setSellerUsername(seller.username || seller.first_name);
+
     } catch (err) {
-      console.error("Failed to handle deep link:", err);
+      console.error("fetchMarketListing error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDealById = async (dealId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("deals")
+        .select("*")
+        .eq("deal_id", dealId)
+        .single();
+
+      if (error || !data) {
+        console.error("Error fetching deal:", error);
+        setError("Deal not found or you don't have access.");
+        return;
+      }
+      setSelectedDeal(data);
+    } catch (err) {
+      console.error("fetchDealById error:", err);
     } finally {
       setLoading(false);
     }
@@ -1411,14 +1457,14 @@ export default function MiniAppPage() {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-6 pointer-events-none">
         <div className={`mx-4 w-full max-w-[420px] pointer-events-auto rounded-[2rem] ${isDark ? "bg-[#1c1c1e]/85 border-white/5" : "bg-white/80 border-black/[0.04]"} backdrop-blur-2xl border shadow-[0_8px_32px_rgba(0,0,0,0.15)] px-2 py-2`}>
-          <div className="flex items-center justify-around w-full">
+          <div className="grid grid-cols-5 w-full">
             {navTabs.map((tab) => {
               const active = view === tab.id;
               return (
                 <button
                   key={tab.id}
                   onClick={() => navigate(tab.id)}
-                  className={`relative flex flex-col items-center justify-center flex-1 transition-all duration-300 h-12`}
+                  className={`relative flex flex-col items-center justify-center transition-all duration-300 h-12`}
                 >
                   <div className={`flex items-center justify-center transition-all duration-300 ${active ? "opacity-100 scale-110" : "opacity-40 scale-100 hover:opacity-75"}`}>
                     <tab.icon className={`w-[22px] h-[22px] ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white" : "text-black")}`} />
