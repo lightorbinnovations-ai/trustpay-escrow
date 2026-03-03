@@ -510,9 +510,13 @@ function StaggerItem({ children, index }: { children: React.ReactNode; index: nu
 
 export default function MiniAppPage() {
   const [view, setViewOriginal] = useState<View>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("listing_id") || params.get("token")) {
+      return "loading";
+    }
     const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param;
     if (startParam?.startsWith("escrow_")) {
-      return "new-deal";
+      return "loading";
     }
     return "home";
   });
@@ -596,6 +600,8 @@ export default function MiniAppPage() {
   };
 
   useEffect(() => {
+    console.log("MiniAppPage Mount. URL:", window.location.href);
+    console.log("InitDataUnsafe Params:", webApp?.initDataUnsafe);
     if (webApp) {
       webApp.ready();
       webApp.expand();
@@ -611,13 +617,13 @@ export default function MiniAppPage() {
       }
     }
   }, []);
-
   // Handle deep link (start_param) or token-based link
   useEffect(() => {
-    if (!webApp || deepLinkHandled) return;
+    if (deepLinkHandled) return;
 
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const directListingId = params.get('listing_id');
 
     if (token) {
       console.log("Token detected in URL:", token);
@@ -626,13 +632,24 @@ export default function MiniAppPage() {
       return;
     }
 
+    if (directListingId) {
+      console.log("Direct listing_id detected in URL:", directListingId);
+      setDeepLinkHandled(true);
+      fetchMarketListing(directListingId).then(() => {
+        console.log("Navigating to new-deal via direct URL");
+        setDirection("forward");
+        setView("new-deal");
+      });
+      return;
+    }
+
     const startParam = (webApp.initDataUnsafe as any).start_param;
     if (startParam && startParam.startsWith('escrow_')) {
       const listingId = startParam.replace('escrow_', '');
-      console.log("Deep link detected:", listingId);
+      console.log("Deep link detected via start_param:", listingId);
       setDeepLinkHandled(true);
       fetchMarketListing(listingId).then(() => {
-        console.log("Navigating to new-deal");
+        console.log("Navigating to new-deal via start_param");
         setDirection("forward");
         setView("new-deal");
       });
@@ -1382,37 +1399,37 @@ export default function MiniAppPage() {
     </div>
   );
 
-  // Bottom Navigation Bar — styled like TrustPay Markets
+  // Bottom Navigation Bar — Premium "Floating Island" Design
   const BottomNav = () => {
     const navTabs = [
       { id: "home" as View, label: t.home.nav_home || "Home", icon: Home },
       { id: "my-deals" as View, label: t.deals.tab_all || "Deals", icon: List },
-      { id: "new-deal" as View, label: t.home.create_btn || "New", icon: Plus, isCenter: true },
+      { id: "new-deal" as View, label: t.home.create_btn || "New", icon: Plus },
       { id: "history" as View, label: t.history.header || "History", icon: HistoryIcon },
       { id: "settings" as View, label: t.sidebar.settings || "Profile", icon: User },
     ];
     return (
-      <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-[env(safe-area-inset-bottom)] pointer-events-none">
-        <div className={`mx-4 mb-3 w-full max-w-[440px] pointer-events-auto rounded-[1.25rem] ${isDark ? "bg-[#1c1c1e]/90 border-white/10" : "bg-white/90 border-black/[0.06]"} backdrop-blur-xl border shadow-[0_4px_24px_rgba(0,0,0,0.08)] px-1 py-2`}>
-          <div className="flex items-center justify-around">
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-6 pointer-events-none">
+        <div className={`mx-6 w-full max-w-[400px] pointer-events-auto rounded-3xl ${isDark ? "bg-[#1c1c1e]/80 border-white/5" : "bg-white/80 border-black/[0.03]"} backdrop-blur-3xl border shadow-[0_12px_40px_-12px_rgba(0,0,0,0.25)] px-1.5 py-1.5`}>
+          <div className="flex items-center">
             {navTabs.map((tab) => {
               const active = view === tab.id;
-              if (tab.isCenter) {
-                return (
-                  <button key={tab.id} onClick={() => navigate(tab.id)} className="relative flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-colors">
-                    {active && <div className={`absolute inset-0 rounded-xl ${isDark ? "bg-white/10" : "bg-black/5"}`} />}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-md relative z-10 -mt-2">
-                      <Plus className="w-5 h-5 text-white" />
-                    </div>
-                    <span className={`relative z-10 text-[10px] font-semibold transition-colors mt-0.5 ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white/35" : "text-black/35")}`}>{tab.label}</span>
-                  </button>
-                );
-              }
               return (
-                <button key={tab.id} onClick={() => navigate(tab.id)} className="relative flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-colors">
-                  {active && <div className={`absolute inset-0 rounded-xl ${isDark ? "bg-[hsl(224,71%,60%)]/20" : "bg-[hsl(224,71%,50%)]/10"}`} />}
-                  <tab.icon className={`relative z-10 w-5 h-5 transition-colors ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white/35" : "text-black/35")}`} />
-                  <span className={`relative z-10 text-[10px] font-semibold transition-colors ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white/35" : "text-black/35")}`}>{tab.label}</span>
+                <button
+                  key={tab.id}
+                  onClick={() => navigate(tab.id)}
+                  className={`relative flex flex-col items-center justify-center flex-1 transition-all duration-300 h-10`}
+                >
+                  <div className={`flex items-center justify-center transition-all duration-300 ${active ? "opacity-100 scale-110" : "opacity-40 scale-100 hover:opacity-60"}`}>
+                    <tab.icon className={`w-5 h-5 ${active ? (isDark ? "text-[hsl(224,71%,60%)]" : "text-[hsl(224,71%,50%)]") : (isDark ? "text-white" : "text-black")}`} />
+                  </div>
+                  {active && (
+                    <div className={`absolute -bottom-0.5 w-1 h-1 rounded-full ${isDark ? "bg-[hsl(224,71%,60%)]" : "bg-[hsl(224,71%,50%)]"}`} />
+                  )}
+                  {/* Subtle label only if active or very small fonts */}
+                  <span className={`text-[8px] font-bold mt-0.5 transition-all duration-300 ${active ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"}`}>
+                    {tab.label}
+                  </span>
                 </button>
               );
             })}
@@ -1520,12 +1537,18 @@ export default function MiniAppPage() {
     { id: "settings" as View, label: t.sidebar.settings, subtitle: t.sidebar.settings_sub, icon: Settings, color: "from-gray-500 to-gray-600" },
   ];
 
-  // ===== LOADING STATE =====
-  if (loading) {
+  // ===== LOADING STATE (GLOBAL) =====
+  if (view === "loading" || (loading && view !== "home")) {
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} flex flex-col items-center justify-center p-6 gap-4`}>
-        <Loader2 className="w-10 h-10 animate-spin text-[hsl(224,71%,50%)]" />
-        <p className={`text-sm ${textSecondary} animate-pulse`}>{t.common.loading}</p>
+        <div className="relative">
+          <Loader2 className="w-12 h-12 animate-spin text-[hsl(224,71%,50%)]" />
+          <Shield className="w-6 h-6 text-white absolute inset-0 m-auto opacity-20" />
+        </div>
+        <div className="text-center space-y-1">
+          <p className="font-bold text-lg">TrustPay Escrow</p>
+          <p className={`text-sm ${textSecondary} animate-pulse`}>Initializing secure transaction...</p>
+        </div>
       </div>
     );
   }
