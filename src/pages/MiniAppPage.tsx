@@ -650,19 +650,33 @@ export default function MiniAppPage() {
         // Background sync profile to DB so it persists
         const syncProfile = async () => {
           try {
-            const { data: profile } = await supabase.from("user_profiles").upsert({
+            // 1. Sync to bot_users (used by Edge Functions for auth validation)
+            const { error: botError } = await supabase.from("bot_users").upsert({
               telegram_id: user.id,
+              username: finalUsername,
+              first_name: user.first_name || "",
+              updated_at: new Date().toISOString()
+            }, { onConflict: "telegram_id" });
+
+            if (botError) console.error("bot_users sync error:", botError);
+
+            // 2. Sync to user_profiles (used for bank details and legacy views)
+            // Note: Schema uses 'telegram_chat_id' for the BigInt ID and 'telegram_username' for the text username
+            const { data: profile, error: profileError } = await supabase.from("user_profiles").upsert({
+              telegram_chat_id: user.id,
               telegram_username: `@${finalUsername}`,
               full_name: `${user.first_name || ""}${user.last_name ? " " + user.last_name : ""}`.trim(),
               photo_url: user.photo_url || null,
               updated_at: new Date().toISOString()
-            }, { onConflict: "telegram_id" }).select().single();
+            }, { onConflict: "telegram_username" }).select().single();
 
+            if (profileError) console.error("user_profiles sync error:", profileError);
             if (profile) setDbProfile(profile);
+
           } catch (e) {
-            console.error("Profile sync error:", e);
-            // Fallback fetch if upsert didn't return data
-            const { data } = await supabase.from("user_profiles").select("*").eq("telegram_id", user.id).maybeSingle();
+            console.error("Profile sync exception:", e);
+            // Fallback fetch
+            const { data } = await supabase.from("user_profiles").select("*").eq("telegram_chat_id", user.id).maybeSingle();
             if (data) setDbProfile(data);
           }
         };
@@ -2047,9 +2061,20 @@ export default function MiniAppPage() {
       <div className={`w-full ${isDark ? "bg-[#0a0a0f]/90 border-white/5" : "bg-[#f5f5f7]/90 border-black/[0.04]"} backdrop-blur-xl border-b shadow-sm`}>
         <div className="flex items-center gap-3 px-5 py-3 pt-[calc(env(safe-area-inset-top)+12px)]">
           {showBack && view !== "home" ? (
-            <button onClick={() => navigate(backTo, "back")} className={`w-9 h-9 rounded-full flex items-center justify-center press-effect ${cardBg} border ${cardBorder}`}>
-              <ArrowLeft className={`w-5 h-5 ${isDark ? "text-white/70" : "text-black/70"}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => navigate(backTo, "back")} className={`w-9 h-9 rounded-full flex items-center justify-center press-effect ${cardBg} border ${cardBorder}`}>
+                <ArrowLeft className={`w-5 h-5 ${isDark ? "text-white/70" : "text-black/70"}`} />
+              </button>
+              <button onClick={() => setSidebarOpen(true)} className="press-effect opacity-60 hover:opacity-100 transition-opacity">
+                <div className="w-7 h-7 rounded-lg overflow-hidden bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-sm">
+                  {tgUser?.photoUrl ? (
+                    <img src={tgUser.photoUrl} alt="Profile" className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <span className="text-white font-bold text-[10px]">{tgUser?.firstName?.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+              </button>
+            </div>
           ) : (
             <button onClick={() => setSidebarOpen(true)} className="press-effect">
               <div className="w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center shadow-sm">
