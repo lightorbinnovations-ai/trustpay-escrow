@@ -86,9 +86,18 @@ serve(async (req) => {
       case "create_deal": {
         const { seller, amount, description, market_listing_id } = payload;
 
+        if (!amount || isNaN(amount) || amount <= 0) {
+          throw new Error("Amount must be greater than 0.");
+        }
+        if (!description || typeof description !== "string" || description.trim() === "") {
+          throw new Error("Description cannot be empty.");
+        }
+
         const cleanSeller = seller.replace("@", "").toLowerCase();
 
-        const { data: sellerBot } = await supabaseClient.from("bot_users").select("telegram_id").ilike("username", cleanSeller).maybeSingle();
+        const { data: sellerBot, error: botErr } = await supabaseClient.from("bot_users").select("telegram_id").ilike("username", cleanSeller).maybeSingle();
+        if (botErr) throw botErr;
+
         const { data: sellerProf } = await supabaseClient.from("user_profiles").select("telegram_chat_id").ilike("telegram_username", cleanSeller).maybeSingle();
         const sellerId = sellerBot?.telegram_id || sellerProf?.telegram_chat_id || null;
 
