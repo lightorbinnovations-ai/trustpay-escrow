@@ -295,6 +295,29 @@ serve(async (req) => {
         // Notify seller and trigger payout
         supabaseClient.functions.invoke("deal-notify", { body: { deal_id, action: "delivery_confirmed" } }).catch(e => console.error("Notify error:", e));
 
+        // --- Update Marketplace Transaction if applicable ---
+        // This ensures the Market app "knows" the transaction is done without manual button clicks
+        if (deal.market_listing_id) {
+          try {
+            const MARKET_SUPABASE_URL = Deno.env.get("MARKET_SUPABASE_URL");
+            const MARKET_SERVICE_ROLE_KEY = Deno.env.get("MARKET_SERVICE_ROLE_KEY");
+
+            if (MARKET_SUPABASE_URL && MARKET_SERVICE_ROLE_KEY) {
+              const marketClient = createClient(MARKET_SUPABASE_URL!, MARKET_SERVICE_ROLE_KEY!);
+              await marketClient
+                .from("transactions")
+                .update({
+                  status: "released",
+                  updated_at: new Date().toISOString()
+                })
+                .eq("listing_id", deal.market_listing_id)
+                .eq("buyer_telegram_id", tgUser.id);
+            }
+          } catch (mErr) {
+            console.error("Market-sync error on confirm:", mErr);
+          }
+        }
+
         result = { success: true };
         break;
       }
