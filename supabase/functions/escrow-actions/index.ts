@@ -104,6 +104,10 @@ serve(async (req) => {
         if (!sellerId) throw new Error("Seller not found. The seller must have a TrustPay account.");
         if (Number(sellerId) === userId) throw new Error("Cannot trade with yourself.");
 
+        const { data: buyerBot, error: buyerErr } = await supabaseClient.from("bot_users").select("telegram_id").eq("telegram_id", userId).maybeSingle();
+        if (buyerErr) throw buyerErr;
+        if (!buyerBot) throw new Error("Buyer account not found in system. Please register by interacting with the TrustPay bot.");
+
         const fee = Math.max(300, Math.round(amount * 0.03));
         const dealId = `ESC-${Date.now().toString(36).toUpperCase()}`;
         const cleanDesc = description.trim().replace(/[<>&]/g, "").substring(0, 200);
@@ -313,9 +317,9 @@ serve(async (req) => {
     });
   } catch (error: any) {
     console.error(`[STATE-MACHINE ERROR] ${error.message}`);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ success: false, error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
+      status: 200,
     });
   }
 });

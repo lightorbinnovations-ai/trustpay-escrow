@@ -1148,6 +1148,7 @@ export default function MiniAppPage() {
         body: {
           action: 'create_deal',
           payload: {
+            buyer_id: tgUser?.id,
             seller,
             amount: amt,
             description: description.trim(),
@@ -1160,7 +1161,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data.error || "Failed to create deal.");
+      }
 
       // Extract dealId from response
       const dealId = data?.deal?.deal_id;
@@ -1200,7 +1203,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       supabase.functions.invoke("deal-notify", { body: { deal_id: deal.deal_id, action: "deal_accepted" } }).catch(console.error);
       webApp?.HapticFeedback?.notificationOccurred("success");
@@ -1232,7 +1237,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       supabase.functions.invoke("deal-notify", { body: { deal_id: deal.deal_id, action: "deal_declined" } }).catch(console.error);
       webApp?.HapticFeedback?.notificationOccurred("warning");
@@ -1265,7 +1272,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       supabase.functions.invoke("deal-notify", { body: { deal_id: deal.deal_id, action: "delivery_marked" } }).catch(console.error);
       webApp?.HapticFeedback?.notificationOccurred("success");
@@ -1297,7 +1306,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       supabase.functions.invoke("deal-notify", { body: { deal_id: deal.deal_id, action: "delivery_confirmed" } }).catch(console.error);
       webApp?.HapticFeedback?.notificationOccurred("success");
@@ -1338,7 +1349,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       webApp?.HapticFeedback?.notificationOccurred("warning");
       await refreshAfterAction(deal.deal_id);
@@ -1392,7 +1405,9 @@ export default function MiniAppPage() {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error || data?.success === false) {
+        throw new Error(data?.error || "Transaction failed.");
+      }
 
       webApp?.HapticFeedback?.notificationOccurred("warning");
       setDisputeSuccess(true);
