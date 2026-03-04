@@ -54,9 +54,13 @@ serve(async (req) => {
     }
 
     // Handle optional username and avoid "undefined" string literal issues
-    const safeUsername = (tgUser.username && tgUser.username !== "undefined" && tgUser.username !== "null")
-      ? tgUser.username
-      : `user_${tgUser.id}`;
+    const rawUsername = tgUser.username?.toString().toLowerCase() || "";
+    const isInvalidUsername = !rawUsername || rawUsername === "undefined" || rawUsername === "null" || rawUsername === "";
+
+    const safeUsername = isInvalidUsername
+      ? `user_${tgUser.id}`
+      : rawUsername.replace(/^@/, "");
+
     const userTelegramTag = `@${safeUsername}`;
 
     // 2. Parse Action
@@ -121,7 +125,7 @@ serve(async (req) => {
               `📩 <b>New Escrow Request!</b>\n${LINE}\n\n` +
               `🆔 <code>${dealId}</code>\n` +
               `📝 ${cleanDesc}\n` +
-              `👤 Buyer: ${tgUser.username ? `@${tgUser.username}` : `User ${tgUser.id}`}\n\n` +
+              `👤 Buyer: ${userTelegramTag}\n\n` +
               `💰 Amount: ₦${amount.toLocaleString()}\n` +
               `📤 You'll receive: ₦${sellerReceives.toLocaleString()}\n\n` +
               `👇 <b>Please accept or decline in the app:</b>\n${LINE}`,
@@ -146,6 +150,38 @@ serve(async (req) => {
         break;
       }
 
+      case "update_deal": {
+        const { deal_id, amount, description } = payload;
+        const { data: deal } = await supabaseClient.from("deals").select("*").eq("deal_id", deal_id).single();
+        if (!deal || deal.buyer_telegram.toLowerCase() !== userTelegramTag.toLowerCase()) throw new Error("Unauthorized");
+        if (deal.status !== "pending") throw new Error("Deal can only be edited while pending");
+
+        const fee = Math.max(300, Math.round(amount * 0.03));
+        const { error } = await supabaseClient.from("deals").update({
+          amount,
+          fee,
+          description: description.trim().replace(/[<>&]/g, "").substring(0, 200)
+        }).eq("deal_id", deal_id);
+
+        if (error) throw error;
+        await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_updated", actor: userTelegramTag, details: { new_amount: amount, new_description: description } }]);
+        result = { success: true };
+        break;
+      }
+
+      case "delete_deal": {
+        const { deal_id } = payload;
+        const { data: deal } = await supabaseClient.from("deals").select("*").eq("deal_id", deal_id).single();
+        if (!deal || deal.buyer_telegram.toLowerCase() !== userTelegramTag.toLowerCase()) throw new Error("Unauthorized");
+        if (deal.status !== "pending") throw new Error("Deal can only be deleted while pending");
+
+        const { error } = await supabaseClient.from("deals").delete().eq("deal_id", deal_id);
+        if (error) throw error;
+        await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_deleted", actor: userTelegramTag, details: { amount: deal.amount } }]);
+        result = { success: true };
+        break;
+      }
+
       case "accept_deal": {
         const { deal_id } = payload;
         // Verify user is the seller
@@ -167,14 +203,52 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: `Deal is no longer pending (current status: ${deal.status})` }), { status: 400, headers: corsHeaders });
         }
 
-        const { error } = await supabaseClient.from("deals").update({ status: "accepted" }).eq("deal_id", deal_id);
+        // --- Initialize Paystack Payment Link ---
+        const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
+        let payLink = null;
+        let paymentRef = null;
+
+        if (PAYSTACK_SECRET_KEY) {
+          try {
+            const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                amount: deal.amount * 100, // Paystack uses Kobo
+                email: `${deal.buyer_telegram.replace("@", "")}@escrowbot.ng`,
+                reference: `${deal_id}-${Date.now()}`,
+                metadata: { deal_id: deal_id, buyer: deal.buyer_telegram, seller: deal.seller_telegram },
+                callback_url: "https://t.me/TrustPay9jaBot",
+              }),
+            });
+            const paystackData = await paystackRes.json();
+            if (paystackData.status && paystackData.data?.authorization_url) {
+              payLink = paystackData.data.authorization_url;
+              paymentRef = paystackData.data.reference;
+            }
+          } catch (pErr) {
+            console.error("Paystack init failed during accept:", pErr);
+          }
+        }
+
+        const { error } = await supabaseClient.from("deals").update({
+          status: "accepted",
+          paystack_payment_link: payLink,
+          payment_ref: paymentRef
+        }).eq("deal_id", deal_id);
+
         if (error) throw error;
 
-        await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_accepted", actor: userTelegramTag, details: { amount: deal.amount, buyer: deal.buyer_telegram } }]);
+        await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_accepted", actor: userTelegramTag, details: { amount: deal.amount, buyer: deal.buyer_telegram, pay_link: !!payLink } }]);
 
         result = { success: true };
+
+        // Notify buyer - deal is accepted and payment is ready
+        supabaseClient.functions.invoke("deal-notify", { body: { deal_id, action: "deal_accepted" } }).catch(e => console.error("Notify error:", e));
+
         break;
       }
+
 
       case "decline_deal": {
         const { deal_id } = payload;
@@ -184,8 +258,11 @@ serve(async (req) => {
         }
         if (deal.status !== "pending") throw new Error("Deal is no longer pending");
 
-        const { error } = await supabaseClient.from("deals").update({ status: "completed", completed_at: new Date().toISOString(), dispute_resolution: "declined_by_seller" }).eq("deal_id", deal_id);
+        const { error } = await supabaseClient.from("deals").update({ status: "cancelled", completed_at: new Date().toISOString(), dispute_resolution: "declined_by_seller" }).eq("deal_id", deal_id);
         if (error) throw error;
+
+        // Also notify buyer
+        supabaseClient.functions.invoke("deal-notify", { body: { deal_id, action: "deal_declined" } }).catch(console.error);
 
         await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_declined", actor: userTelegramTag, details: { reason: "Seller declined via Mini App", amount: deal.amount } }]);
         result = { success: true };
@@ -215,8 +292,12 @@ serve(async (req) => {
         const { error } = await supabaseClient.from("deals").update({ status: "completed", completed_at: new Date().toISOString() }).eq("deal_id", deal_id);
         if (error) throw error;
 
+
         await supabaseClient.from("audit_logs").insert([{ deal_id, action: "delivery_confirmed", actor: userTelegramTag, details: { amount: deal.amount, fee: deal.fee } }]);
-        // Note: The database webhook usually handles the actual paystack payout on completion.
+
+        // Notify seller and trigger payout
+        supabaseClient.functions.invoke("deal-notify", { body: { deal_id, action: "delivery_confirmed" } }).catch(e => console.error("Notify error:", e));
+
         result = { success: true };
         break;
       }

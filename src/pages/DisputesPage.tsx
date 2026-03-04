@@ -94,15 +94,23 @@ export default function DisputesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-[hsl(var(--status-disputed)/0.1)] flex items-center justify-center">
-          <AlertTriangle className="w-5 h-5 text-status-disputed" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dispute Center</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {disputes.length} active dispute{disputes.length !== 1 ? "s" : ""} · {resolved.length} resolved
-          </p>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => window.history.back()}
+          className="w-10 h-10 rounded-xl bg-card border border-border flex items-center justify-center hover:bg-accent transition-colors shrink-0"
+        >
+          <ChevronRight className="w-5 h-5 rotate-180" />
+        </button>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-[hsl(var(--status-disputed)/0.1)] flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-status-disputed" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">{language === 'fr' ? "Centre de Litiges" : "Dispute Center"}</h2>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {disputes.length} {language === 'fr' ? "litige" : "active dispute"}{disputes.length !== 1 ? "s" : ""} · {resolved.length} {language === 'fr' ? "résolus" : "resolved"}
+            </p>
+          </div>
         </div>
       </div>
 

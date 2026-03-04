@@ -101,17 +101,12 @@ serve(async (req) => {
         ...(recipientCode && { paystack_recipient_code: recipientCode })
       };
 
-      const { error: updateError } = await supabaseClient
+      // Use upsert to handle both first-time creation and subsequent updates
+      const { error: upsertError } = await supabaseClient
         .from("user_profiles")
-        .update(updateData)
-        .eq("telegram_id", tgUser.id);
+        .upsert(updateData, { onConflict: "telegram_id" });
 
-      if (updateError) {
-        const { error: insertError } = await supabaseClient
-          .from("user_profiles")
-          .insert([updateData]);
-        if (insertError) throw insertError;
-      }
+      if (upsertError) throw upsertError;
 
       return new Response(JSON.stringify({ success: true, recipientCode }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

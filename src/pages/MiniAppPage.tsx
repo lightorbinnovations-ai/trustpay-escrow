@@ -31,7 +31,7 @@ declare global {
 }
 
 type Deal = { id: string; deal_id: string; buyer_telegram: string; seller_telegram: string; amount: number; fee: number; description: string; status: string; created_at: string; paystack_payment_link: string | null; delivered_at: string | null; refund_status: string | null; dispute_reason: string | null; dispute_resolution: string | null; completed_at: string | null };
-type View = "home" | "new-deal" | "my-deals" | "deal-detail" | "settings" | "raise-dispute" | "contact" | "faq" | "history";
+type View = "home" | "new-deal" | "my-deals" | "deal-detail" | "settings" | "raise-dispute" | "contact" | "faq" | "history" | "loading";
 type TelegramUser = { id: number; username: string; firstName: string; lastName?: string; photoUrl?: string };
 type UserProfile = { bank_name: string | null; account_number: string | null; account_name: string | null; telegram_username: string };
 type Rating = { id: string; deal_id: string; rater_telegram: string; rated_telegram: string; rating: number; comment: string; created_at: string };
@@ -542,6 +542,9 @@ export default function MiniAppPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [successDeal, setSuccessDeal] = useState<string | null>(null);
+  const [isEditingDeal, setIsEditingDeal] = useState(false);
+  const [editAmount, setEditAmount] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [homeDeals, setHomeDeals] = useState<Deal[]>([]);
   const [allUserDeals, setAllUserDeals] = useState<Deal[]>([]);
@@ -629,14 +632,16 @@ export default function MiniAppPage() {
     if (webApp) {
       webApp.ready();
       webApp.expand();
-      const user = webApp.initDataUnsafe.user;
+      const user = webApp.initDataUnsafe?.user;
       if (user) {
+        const u = user.username?.toString().toLowerCase() || "";
+        const isInvalid = !u || u === "undefined" || u === "null";
         setTgUser({
           id: user.id,
-          username: user.username || `user_${user.id}`,
-          firstName: user.first_name || "User",
-          lastName: user.last_name,
-          photoUrl: user.photo_url,
+          username: isInvalid ? `user_${user.id}` : u.replace(/^@/, ""),
+          firstName: user.first_name || "",
+          lastName: user.last_name || "",
+          photoUrl: user.photo_url || ""
         });
       }
     }
@@ -1398,6 +1403,81 @@ export default function MiniAppPage() {
     setRatingSubmitting(false);
   };
 
+  const handleEditDeal = () => {
+    if (!selectedDeal) return;
+    setEditAmount(selectedDeal.amount.toLocaleString());
+    setEditDescription(selectedDeal.description);
+    setIsEditingDeal(true);
+  };
+
+  const handleUpdateDeal = async () => {
+    if (!selectedDeal) return;
+    setError("");
+    const amt = parseInt(editAmount.replace(/,/g, ""));
+    if (isNaN(amt) || amt < 100 || amt > 1000000) { setError("Amount: ₦100 – ₦1,000,000"); return; }
+    if (!editDescription.trim() || editDescription.trim().length < 3) { setError("Description too short (min 3 chars)"); return; }
+
+    setActionLoading(true);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) throw new Error("Telegram authentication missing");
+
+      const { data, error } = await supabase.functions.invoke('escrow-actions', {
+        body: {
+          action: 'update_deal',
+          payload: {
+            deal_id: selectedDeal.deal_id,
+            amount: amt,
+            description: editDescription.trim()
+          }
+        },
+        headers: { 'x-telegram-init-data': initData }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      webApp?.HapticFeedback?.notificationOccurred("success");
+      setIsEditingDeal(false);
+      await refreshAfterAction(selectedDeal.deal_id);
+    } catch (err: any) {
+      console.error("Update deal error:", err);
+      setError(err.message || "Failed to update deal");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteDeal = async () => {
+    if (!selectedDeal) return;
+    if (!window.confirm("Are you sure you want to delete this deal? This action cannot be undone.")) return;
+
+    setActionLoading(true);
+    try {
+      const initData = webApp?.initData;
+      if (!initData) throw new Error("Telegram authentication missing");
+
+      const { data, error } = await supabase.functions.invoke('escrow-actions', {
+        body: {
+          action: 'delete_deal',
+          payload: { deal_id: selectedDeal.deal_id }
+        },
+        headers: { 'x-telegram-init-data': initData }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      webApp?.HapticFeedback?.notificationOccurred("warning");
+      navigate("my-deals");
+    } catch (err: any) {
+      console.error("Delete deal error:", err);
+      setError(err.message || "Failed to delete deal");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Shared styles
   const bg = isDark ? "bg-[#0a0a0f]" : "bg-[#f5f5f7]";
   const cardBg = isDark ? "bg-[#1c1c1e]" : "bg-white";
@@ -1413,6 +1493,7 @@ export default function MiniAppPage() {
     completed: { bg: isDark ? "bg-emerald-500/10" : "bg-emerald-50", text: isDark ? "text-emerald-400" : "text-emerald-600", icon: <CheckCircle className="w-3 h-3" />, label: "Completed" },
     disputed: { bg: isDark ? "bg-red-500/10" : "bg-red-50", text: isDark ? "text-red-400" : "text-red-600", icon: <AlertTriangle className="w-3 h-3" />, label: "Disputed" },
     refunded: { bg: isDark ? "bg-orange-500/10" : "bg-orange-50", text: isDark ? "text-orange-400" : "text-orange-600", icon: <AlertTriangle className="w-3 h-3" />, label: "Refunded" },
+    cancelled: { bg: isDark ? "bg-red-500/10" : "bg-gray-100", text: isDark ? "text-red-400" : "text-gray-600", icon: <X className="w-3 h-3" />, label: "Cancelled" },
   };
 
   const BANKS = ["Access Bank", "GTBank", "First Bank", "UBA", "Zenith Bank", "Kuda", "OPay", "PalmPay", "Moniepoint", "Wema Bank", "Sterling Bank", "Fidelity Bank", "FCMB", "Union Bank", "Polaris Bank", "Stanbic IBTC"];
@@ -1589,7 +1670,7 @@ export default function MiniAppPage() {
       readIds.push(id);
       localStorage.setItem(`tp9ja_read_notifs_${tgUser.id}`, JSON.stringify(readIds));
     }
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    setNotifications(prev => prev.filter(n => n.id !== id));
     webApp?.HapticFeedback?.impactOccurred("light");
   };
 
@@ -1623,10 +1704,21 @@ export default function MiniAppPage() {
                 {t.notifications.mark_all}
               </button>
             )}
-            <button onClick={() => setNotifPanelOpen(false)} className="press-effect p-1.5">
-              <X className={`w-5 h-5 ${textSecondary}`} />
+
+            <button
+              onClick={() => {
+                setNotifPanelOpen(false);
+                webApp?.HapticFeedback?.impactOccurred("light");
+              }}
+              className="w-10 h-10 -mr-2 flex items-center justify-center press-effect transition-transform hover:scale-110 active:scale-90"
+              aria-label="Close Notifications"
+            >
+              <div className={`p-1.5 rounded-full ${isDark ? "hover:bg-white/10" : "hover:bg-black/5"}`}>
+                <X className={`w-6 h-6 ${textSecondary}`} />
+              </div>
             </button>
           </div>
+
         </div>
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
@@ -1655,7 +1747,7 @@ export default function MiniAppPage() {
                   <p className="text-[13px] leading-snug">{n.message}</p>
                   <p className={`text-[11px] mt-1 ${textSecondary}`}>{new Date(n.time).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
                 </div>
-                <button onClick={() => deleteNotification(n.id)} className={`press-effect p-1.5 rounded-lg flex-shrink-0 ${isDark ? "hover:bg-white/10" : "hover:bg-black/[0.06]"}`}>
+                <button onClick={(e) => { e.stopPropagation(); deleteNotification(n.id); }} className={`press-effect p-1.5 rounded-lg flex-shrink-0 ${isDark ? "hover:bg-white/10" : "hover:bg-black/[0.06]"}`}>
                   <X className={`w-4 h-4 ${isDark ? "text-red-400" : "text-red-500"}`} />
                 </button>
               </div>
@@ -1752,6 +1844,9 @@ export default function MiniAppPage() {
             </div>
           </div>
         </div>
+
+        {/* Edit Deal Modal */}
+        <EditDealModal />
 
         {/* Nav items */}
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -2550,6 +2645,12 @@ export default function MiniAppPage() {
                       <input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="John Doe"
                         className={`w-full p-3 rounded-xl text-[14px] border outline-none input-focus ${inputBg}`} maxLength={100} />
                     </div>
+                    {profileSuccess && (
+                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[13px] font-medium animate-fade-in-up">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{language === 'fr' ? "Profil mis à jour avec succès" : "Profile updated successfully"}</span>
+                      </div>
+                    )}
                     <button onClick={handleSaveProfile} disabled={savingProfile}
                       className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold py-3 rounded-xl text-[14px] press-effect disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 mt-1">
                       {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
@@ -2644,9 +2745,31 @@ export default function MiniAppPage() {
                   <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-emerald-500" />
                   </div>
-                  <p className="text-lg font-bold">{t.new_deal.created}</p>
+                  <p className={`text-lg font-bold`}>{t.new_deal.created}</p>
                   <p className={`text-sm mt-1 font-mono ${textSecondary}`}>{successDeal}</p>
                   <p className={`text-xs mt-2 ${textSecondary}`}>{t.new_deal.waiting}</p>
+
+                  <div className="mt-6 flex flex-col gap-2">
+                    <button
+                      onClick={() => {
+                        const botUsername = "TrustPay9jaBot";
+                        const text = `Hey, I just created a secure escrow deal for our transaction! 🛡️\n\n💰 Amount: ₦${amount}\n📝 ${description}\n\nPlease tap below to accept:`;
+                        const url = `https://t.me/${botUsername}/app?startapp=deal_${successDeal}`;
+                        const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+                        webApp?.openTelegramLink(shareUrl);
+                      }}
+                      className="w-full bg-blue-500 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 press-effect shadow-lg shadow-blue-500/25"
+                    >
+                      <Send className="w-4 h-4" />
+                      {language === 'fr' ? "Partager avec le vendeur" : "Share with Seller"}
+                    </button>
+                    <button
+                      onClick={() => navigate("my-deals")}
+                      className={`w-full font-semibold py-3.5 rounded-xl text-[14px] ${textSecondary} press-effect`}
+                    >
+                      {t.dispute.view_deals}
+                    </button>
+                  </div>
                 </div>
               </StaggerItem>
             ) : (
@@ -2884,6 +3007,20 @@ export default function MiniAppPage() {
                   </div>
                 )}
 
+                {/* BUYER: Edit/Delete pending */}
+                {isBuyer && selectedDeal.status === "pending" && (
+                  <div className={`border-t ${cardBorder} p-4 space-y-2`}>
+                    <button onClick={handleEditDeal} disabled={actionLoading}
+                      className="w-full bg-amber-500 text-white font-semibold py-3.5 rounded-xl text-[15px] press-effect shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2">
+                      <Plus className="w-4 h-4 rotate-45" /> {language === 'fr' ? "Modifier l'offre" : "Edit Deal"}
+                    </button>
+                    <button onClick={handleDeleteDeal} disabled={actionLoading}
+                      className={`w-full font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 ${isDark ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-red-50 text-red-600 border border-red-200"} flex items-center justify-center gap-2`}>
+                      <X className="w-4 h-4" /> {language === 'fr' ? "Supprimer l'offre" : "Delete Deal"}
+                    </button>
+                  </div>
+                )}
+
                 {/* BUYER: Waiting for seller */}
                 {isBuyer && selectedDeal.status === "pending" && (
                   <div className={`border-t ${cardBorder} p-4`}>
@@ -3063,6 +3200,55 @@ export default function MiniAppPage() {
       </div>
     );
   }
+
+  // ===== EDIT DEAL MODAL =====
+  const EditDealModal = () => isEditingDeal ? (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsEditingDeal(false)} />
+      <div className={`relative w-full max-w-[400px] rounded-3xl p-6 shadow-2xl animate-fade-in-scale ${isDark ? "bg-[#1c1c1e] text-white border border-white/5" : "bg-white text-black"}`}>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold">{language === 'fr' ? "Modifier l'Offre" : "Edit Deal"}</h3>
+          <button onClick={() => setIsEditingDeal(false)} className={`p-2 rounded-full ${isDark ? "hover:bg-white/10" : "hover:bg-black/5"}`}>
+            <X className="w-5 h-5 opacity-40" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.amount}</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={editAmount}
+              onChange={(e) => {
+                const val = e.target.value.replace(/[^0-9]/g, "");
+                if (!val) { setEditAmount(""); return; }
+                setEditAmount(Number(val).toLocaleString());
+              }}
+              className={`w-full p-4 rounded-xl text-[16px] border outline-none font-bold ${inputBg} border-amber-500/30`}
+            />
+          </div>
+          <div>
+            <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.description}</label>
+            <textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              className={`w-full p-4 rounded-xl text-[15px] border outline-none min-h-[100px] ${inputBg}`}
+            />
+          </div>
+
+          <button
+            onClick={handleUpdateDeal}
+            disabled={actionLoading}
+            className="w-full bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-amber-500/20 press-effect flex items-center justify-center gap-2"
+          >
+            {actionLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+            {language === 'fr' ? "Enregistrer" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return null;
 }

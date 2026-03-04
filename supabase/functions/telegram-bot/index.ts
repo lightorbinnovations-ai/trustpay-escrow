@@ -255,7 +255,7 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          const fee = Math.max(300, Math.round(amt * 0.05));
+          const fee = Math.max(300, Math.round(amt * 0.03));
           const sellerReceives = amt - fee;
           const cleanDesc = sanitizeInput(dlDescription);
 
@@ -265,7 +265,7 @@ serve(async (req) => {
             `│ 📝 <b>${cleanDesc}</b>\n` +
             `│ 👤 Seller: @${cleanSeller}\n│\n` +
             `│ 💰 Amount:     ₦${amt.toLocaleString()}\n` +
-            `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+            `│ 💵 Fee (3%):   ₦${fee.toLocaleString()}\n` +
             `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
             `│ 🏷️ Listing ID: ${dlListingId.substring(0, 8)}...\n` +
             `└─────────────────────┘\n\n` +
@@ -311,7 +311,7 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          const fee = Math.max(300, Math.round(amt * 0.05));
+          const fee = Math.max(300, Math.round(amt * 0.03));
           const sellerReceives = amt - fee;
           const cleanDesc = sanitizeInput(dlDescription);
 
@@ -321,7 +321,7 @@ serve(async (req) => {
             `│ 📝 <b>${cleanDesc}</b>\n` +
             `│ 👤 Seller: @${cleanSeller}\n│\n` +
             `│ 💰 Amount:     ₦${amt.toLocaleString()}\n` +
-            `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+            `│ 💵 Fee (3%):   ₦${fee.toLocaleString()}\n` +
             `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
             (dlListingId ? `│ 🏷️ Listing ID: ${dlListingId.substring(0, 8)}...\n` : "") +
             `└─────────────────────┘\n\n` +
@@ -494,7 +494,7 @@ serve(async (req) => {
             `│ 📝 ${cleanDesc}\n` +
             `│ 👤 Seller: @${cleanSeller}\n│\n` +
             `│ 💰 Amount:     ₦${amt.toLocaleString()}\n` +
-            `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+            `│ 💵 Fee (3%):   ₦${fee.toLocaleString()}\n` +
             `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
             (dlProductId ? `│ 🏷️ Product ID: ${dlProductId}\n` : "") +
             `└─────────────────────┘\n\n` +
@@ -548,7 +548,7 @@ serve(async (req) => {
         `├ 3️⃣ <b>Buyer Pays</b> → Funds held in escrow\n` +
         `├ 4️⃣ <b>Seller Delivers</b> → Marks "Delivered"\n` +
         `├ 5️⃣ <b>Buyer Confirms</b> → Clicks "✅ Received"\n` +
-        `└ 6️⃣ <b>Seller Paid!</b> → 95% sent to bank 🎉\n\n` +
+        `└ 6️⃣ <b>Seller Paid!</b> → 93% sent to bank 🎉\n\n` +
         `${THIN}\n<b>❌ Cancellation:</b>\n` +
         `• <b>Before acceptance</b> — Buyer/seller can cancel free\n` +
         `• <b>Within 1 hour</b> of payment — Auto-refund\n` +
@@ -813,7 +813,7 @@ serve(async (req) => {
         `│ 👤 Seller: @${sellerUsername}\n│\n` +
         `│ ${THIN}\n` +
         `│ 💰 Amount:     ₦${amount.toLocaleString()}\n` +
-        `│ 💵 Fee (5%):   ₦${fee.toLocaleString()}\n` +
+        `│ 💵 Fee (3%):   ₦${fee.toLocaleString()}\n` +
         `│ 📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n` +
         `│ ${THIN}\n│\n` +
         `│ ${progressBar("pending")}\n` +
@@ -881,7 +881,7 @@ serve(async (req) => {
 
           const cleanSeller = dlSeller.replace(/^@/, "");
           const amt = parseInt(dlAmount);
-          const fee = Math.max(300, Math.round(amt * 0.05));
+          const fee = Math.max(300, Math.round(amt * 0.03));
           const sellerReceives = amt - fee;
           const dealId = `MKT-${Date.now().toString(36).toUpperCase()}`;
           const cleanDesc = sanitizeInput(dlDescription + (dlProductId ? ` [${dlProductId}]` : ""));
@@ -980,12 +980,12 @@ serve(async (req) => {
           `├ 3️⃣ <b>Buyer Pays</b> → Click "💳 Pay Now"\n` +
           `├ 4️⃣ <b>Seller Delivers</b> → Marks "📦 Delivered"\n` +
           `├ 5️⃣ <b>Buyer Confirms</b> → Clicks "✅ Received"\n` +
-          `└ 6️⃣ <b>Seller Paid!</b> → 95% to bank 🎉\n\n` +
+          `└ 6️⃣ <b>Seller Paid!</b> → 93% to bank 🎉\n\n` +
           `${THIN}\n<b>❌ Cancellation:</b>\n` +
           `• <b>Before acceptance</b> — Cancel free (buyer or seller)\n` +
           `• <b>Within 1 hour</b> of payment — Auto-refund\n` +
           `• <b>After 1 hour</b> — Dispute for admin review\n\n` +
-          `🛡️ Dispute ${DOT} ⏰ 48h auto-release ${DOT} 🔐 Secure\n💰 Max: ₦20,000 ${DOT} Fee: 5% (min ₦300)\n${LINE}`,
+          `🛡️ Dispute ${DOT} ⏰ 48h auto-release ${DOT} 🔐 Secure\n💰 Max: ₦20,000 ${DOT} Fee: 3% (min ₦300)\n${LINE}`,
           { inline_keyboard: [[{ text: "➕ New Deal", callback_data: "open_newdeal" }, { text: "📋 My Deals", callback_data: "open_mydeals" }], [{ text: "🏦 Register Bank", callback_data: "open_register" }], [{ text: "🔙 Back to Menu", callback_data: "open_start" }]] }
         );
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -1735,7 +1735,7 @@ serve(async (req) => {
           }
 
           const amount = Number(tx.amount);
-          const fee = Math.max(300, Math.round(amount * 0.05));
+          const fee = Math.max(300, Math.round(amount * 0.03));
           const sellerAmount = amount - fee;
 
           // Attempt auto-payout to seller
