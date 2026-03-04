@@ -2902,8 +2902,8 @@ export default function MiniAppPage() {
               <div className="space-y-2">
                 {activeDeals.map((deal, i) => {
                   const st = statusConfig[deal.status] || statusConfig.pending;
-                  const isBuyer = usernameMatch(deal.buyer_telegram, `@${tgUser?.username}`);
-                  const isSeller = usernameMatch(deal.seller_telegram, `@${tgUser?.username}`);
+                  const isBuyer = deal.buyer_id && Number(deal.buyer_id) === tgUser?.id;
+                  const isSeller = deal.seller_id && Number(deal.seller_id) === tgUser?.id;
                   const statusLabel = deal.status === "funded" && deal.delivered_at ? t.deals.delivered : (st.label === "Accepted" ? t.details.progress.accepted : st.label === "Funded" ? t.details.progress.paid : st.label);
                   const needsAction = (isSeller && deal.status === "pending") ||
                     (isBuyer && deal.status === "accepted") ||
@@ -2946,8 +2946,8 @@ export default function MiniAppPage() {
   // ===== DEAL DETAIL =====
   if (view === "deal-detail" && selectedDeal) {
     const st = statusConfig[selectedDeal.status] || statusConfig.pending;
-    const isBuyer = usernameMatch(selectedDeal.buyer_telegram, `@${tgUser?.username}`);
-    const isSeller = usernameMatch(selectedDeal.seller_telegram, `@${tgUser?.username}`);
+    const isBuyer = selectedDeal.buyer_id && Number(selectedDeal.buyer_id) === tgUser?.id;
+    const isSeller = selectedDeal.seller_id && Number(selectedDeal.seller_id) === tgUser?.id;
     const statusLabel = selectedDeal.status === "funded" && selectedDeal.delivered_at ? t.deals.delivered : (st.label === "Accepted" ? t.details.progress.accepted : st.label === "Funded" ? t.details.progress.paid : st.label);
 
     return (
@@ -3022,6 +3022,15 @@ export default function MiniAppPage() {
                     </div>
                   ))}
                 </div>
+
+                {error && (
+                  <div className={`border-t ${cardBorder} p-4`}>
+                    <div className="flex items-center gap-2 p-3.5 rounded-xl bg-red-500/10 border border-red-500/20">
+                      <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-red-500 text-[13px] font-semibold">{error}</p>
+                    </div>
+                  </div>
+                )}
 
                 {/* SELLER: Accept/Decline pending */}
                 {isSeller && selectedDeal.status === "pending" && (
@@ -3268,6 +3277,13 @@ export default function MiniAppPage() {
               className={`w-full p-4 rounded-xl text-[15px] border outline-none min-h-[100px] ${inputBg}`}
             />
           </div>
+
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+              <p className="text-red-500 text-[12px] font-medium">{error}</p>
+            </div>
+          )}
 
           <button
             onClick={handleUpdateDeal}
