@@ -599,6 +599,30 @@ export default function MiniAppPage() {
     webApp?.HapticFeedback?.impactOccurred("light");
   };
 
+  const trackAdView = useCallback(async (adId: string) => {
+    try {
+      const initData = webApp?.initData;
+      await marketSupabase.functions.invoke('market-actions', {
+        body: { action: 'track_ad_view', payload: { id: adId } },
+        headers: initData ? { 'x-telegram-init-data': initData } : {}
+      });
+    } catch (e) {
+      console.error("Failed to track ad view", e);
+    }
+  }, [webApp]);
+
+  const trackAdClick = useCallback(async (adId: string) => {
+    try {
+      const initData = webApp?.initData;
+      await marketSupabase.functions.invoke('market-actions', {
+        body: { action: 'track_ad_click', payload: { id: adId } },
+        headers: initData ? { 'x-telegram-init-data': initData } : {}
+      });
+    } catch (e) {
+      console.error("Failed to track ad click", e);
+    }
+  }, [webApp]);
+
   useEffect(() => {
     console.log("MiniAppPage Mount. URL:", window.location.href);
     console.log("InitDataUnsafe Params:", webApp?.initDataUnsafe);
@@ -1483,6 +1507,78 @@ export default function MiniAppPage() {
       </div>
     );
   };
+
+  const AdBanner = ({ position }: { position: string }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const ads = marketAds;
+    if (ads.length === 0) return null;
+
+    // Pick an ad based on position hash or just random
+    const adIndex = Math.abs(position.split('').reduce((a, b) => { a = ((a << 5) - a) + b.charCodeAt(0); return a & a; }, 0)) % ads.length;
+    const ad = ads[adIndex];
+    const images = ad.image_paths && ad.image_paths.length > 0 ? ad.image_paths : ad.image_path ? [ad.image_path] : [];
+    const displayImage = images[currentIndex % images.length];
+
+    useEffect(() => {
+      // Track view when ad changes or on mount
+      trackAdView(ad.id);
+    }, [ad.id, trackAdView]);
+
+    useEffect(() => {
+      if (images.length > 1) {
+        const timer = setInterval(() => setCurrentIndex(p => (p + 1) % images.length), 5000);
+        return () => clearInterval(timer);
+      }
+    }, [images.length]);
+
+    return (
+      <div className="px-4 mb-4">
+        <div
+          onClick={() => {
+            trackAdClick(ad.id);
+            setSelectedAd(ad);
+            setShowAdModal(true);
+          }}
+          className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm press-effect cursor-pointer group`}
+        >
+          {displayImage && (
+            <div className="relative h-24 overflow-hidden">
+              <img src={displayImage} alt={ad.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-md text-white text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">Ad</div>
+            </div>
+          )}
+          <div className="p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-bold text-[13px] truncate">{ad.title}</p>
+              <p className={`text-[11px] ${textSecondary} line-clamp-1`}>{ad.description || "Click to learn more"}</p>
+            </div>
+            <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isDark ? "bg-white/5" : "bg-black/5"}`}>
+              <ExternalLink className="w-4 h-4 opacity-40" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const InstructionCard = ({ title, steps }: { title: string; steps: string[] }) => (
+    <div className={`mx-4 mb-5 p-4 rounded-2xl border ${isDark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50 border-blue-100"}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <HelpCircle className="w-4 h-4 text-blue-500" />
+        <h3 className={`text-[13px] font-bold ${isDark ? "text-blue-400" : "text-blue-700"}`}>{title}</h3>
+      </div>
+      <div className="space-y-2">
+        {steps.map((step, i) => (
+          <div key={i} className="flex gap-2.5">
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-500/10 text-blue-600"}`}>
+              {i + 1}
+            </div>
+            <p className={`text-[12px] leading-snug ${isDark ? "text-blue-400/80" : "text-blue-700/80"}`}>{step}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   // Delete a notification (mark as read / dismiss)
   const deleteNotification = async (id: string) => {
@@ -2530,8 +2626,17 @@ export default function MiniAppPage() {
           <RatingModal />
           <AdModal />
           <Header title={t.new_deal.header} />
-          <div className="px-4 pb-8">
-            <p className={`text-[14px] mb-4 ${textSecondary}`}>{t.new_deal.buyer_hint}</p>
+          <div className="px-4 pb-2">
+            <InstructionCard
+              title="How to create a deal"
+              steps={[
+                "Enter the Seller's Telegram username (e.g. @username)",
+                "Enter the exact amount for the item or service",
+                "Describe what you are buying clearly",
+                "Click 'Create Deal' and wait for the seller to accept"
+              ]}
+            />
+            <p className={`text-[12px] px-1 mb-4 ${textSecondary}`}>{t.new_deal.buyer_hint}</p>
 
             {successDeal ? (
               <StaggerItem index={0}>
@@ -2591,6 +2696,7 @@ export default function MiniAppPage() {
                 </div>
               </StaggerItem>
             )}
+            <AdBanner position="new-deal-bottom" />
           </div>
           <MiniFooter />
         </PageTransition>
@@ -2611,6 +2717,7 @@ export default function MiniAppPage() {
           <AdModal />
           <Header title={t.deals.header} />
           <div className="px-4 pb-8">
+            <AdBanner position="my-deals-top" />
             <p className={`text-[14px] mb-4 ${textSecondary}`}>{deals.length} {deals.length !== 1 ? t.deals.header.toLowerCase() : t.deals.header.toLowerCase().replace(/s$/, "")}</p>
 
             {loading ? (
@@ -2688,6 +2795,7 @@ export default function MiniAppPage() {
           <AdModal />
           <Header title={t.details.header} backTo="my-deals" />
           <div className="px-4 pb-8">
+            <AdBanner position="deal-detail-top" />
             <StaggerItem index={0}>
               <div className={`${cardBg} border ${cardBorder} rounded-2xl overflow-hidden shadow-sm`}>
                 <div className={`px-5 py-3 flex items-center justify-between border-b ${cardBorder}`}>
@@ -2847,6 +2955,14 @@ export default function MiniAppPage() {
                       className={`w-full font-semibold py-3.5 rounded-xl text-[15px] press-effect disabled:opacity-50 ${isDark ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-red-50 text-red-600 border border-red-200"}`}>
                       ⚠️ {t.details.actions.open_dispute}
                     </button>
+                    <InstructionCard
+                      title="Item Received?"
+                      steps={[
+                        "Inspect your item/service carefully",
+                        "If satisfied, click 'Confirm Received' to release funds",
+                        "If there's an issue, click 'Open Dispute' immediately"
+                      ]}
+                    />
                   </div>
                 )}
 
