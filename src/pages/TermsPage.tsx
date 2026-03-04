@@ -28,8 +28,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Acceptance of Terms</h2>
             <p>
-              By accessing and using TrustPay9ja ("the Service"), you agree to be bound by these Terms of Service. 
-              If you do not agree to these terms, please do not use the Service. The Service is operated by 
+              By accessing and using TrustPay9ja ("the Service"), you agree to be bound by these Terms of Service.
+              If you do not agree to these terms, please do not use the Service. The Service is operated by
               <strong> LightOrb Innovations</strong>.
             </p>
           </section>
@@ -37,8 +37,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">2. Service Description</h2>
             <p>
-              TrustPay9ja is an escrow platform integrated with Telegram that facilitates secure transactions 
-              between buyers and sellers. The Service holds funds in escrow until both parties confirm 
+              TrustPay9ja is an escrow platform integrated with Telegram that facilitates secure transactions
+              between buyers and sellers. The Service holds funds in escrow until both parties confirm
               the successful completion of a transaction.
             </p>
           </section>
@@ -46,8 +46,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">3. Eligibility</h2>
             <p>
-              You must be at least 18 years old and have a valid Telegram account to use this Service. 
-              By using the Service, you represent that you meet these requirements and have the legal 
+              You must be at least 18 years old and have a valid Telegram account to use this Service.
+              By using the Service, you represent that you meet these requirements and have the legal
               capacity to enter into binding agreements.
             </p>
           </section>
@@ -55,9 +55,9 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">4. Transaction Limits & Fees</h2>
             <ul className="list-disc list-inside space-y-1.5 ml-2">
-              <li>Maximum transaction amount: ₦20,000 per deal</li>
+              <li>Maximum transaction amount: ₦1,000,000 per deal</li>
               <li>Minimum transaction amount: ₦100 per deal</li>
-              <li>Platform fee: 5% of transaction amount (minimum ₦300)</li>
+              <li>Platform fee: 3% of transaction amount (minimum ₦300)</li>
               <li>Fees are non-refundable once a transaction is completed</li>
             </ul>
           </section>
@@ -77,8 +77,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">6. Disputes</h2>
             <p>
-              If a buyer is not satisfied with the delivery, they may open a dispute. Our team will 
-              review the dispute and make a determination. Funds remain in escrow during the dispute 
+              If a buyer is not satisfied with the delivery, they may open a dispute. Our team will
+              review the dispute and make a determination. Funds remain in escrow during the dispute
               resolution process. We reserve the right to make final decisions on all disputes.
             </p>
           </section>
@@ -86,7 +86,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">7. Auto-Release</h2>
             <p>
-              If the buyer does not confirm receipt or open a dispute within 48 hours of the seller 
+              If the buyer does not confirm receipt or open a dispute within 48 hours of the seller
               marking delivery, funds will be automatically released to the seller.
             </p>
           </section>
@@ -105,8 +105,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">9. Limitation of Liability</h2>
             <p>
-              TrustPay9ja and LightOrb Innovations shall not be liable for any indirect, incidental, special, 
-              or consequential damages arising out of or in connection with your use of the Service. 
+              TrustPay9ja and LightOrb Innovations shall not be liable for any indirect, incidental, special,
+              or consequential damages arising out of or in connection with your use of the Service.
               Our total liability shall not exceed the fees collected on your transactions.
             </p>
           </section>
@@ -114,7 +114,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">10. Changes to Terms</h2>
             <p>
-              We reserve the right to modify these terms at any time. Continued use of the Service 
+              We reserve the right to modify these terms at any time. Continued use of the Service
               after changes constitutes acceptance of the modified terms.
             </p>
           </section>
@@ -122,7 +122,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">11. Contact</h2>
             <p>
-              For questions about these Terms, contact us through the TrustPay9ja Telegram bot 
+              For questions about these Terms, contact us through the TrustPay9ja Telegram bot
               or reach out to <strong>LightOrb Innovations</strong>.
             </p>
           </section>

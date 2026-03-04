@@ -389,7 +389,7 @@ serve(async (req) => {
           const sellerName = sellerUser?.username ? `@${sellerUser.username}` : (sellerUser?.first_name || `User ${listing.seller_telegram_id}`);
 
           const amount = Number(listing.price);
-          const fee = Math.max(300, Math.round(amount * 0.05));
+          const fee = Math.max(300, Math.round(amount * 0.03));
           const sellerReceives = amount - fee;
 
           await sendMessage(chatId,
@@ -473,8 +473,8 @@ serve(async (req) => {
           }
 
           const amt = parseInt(dlAmount);
-          if (isNaN(amt) || amt < 100 || amt > 20000) {
-            await sendMessage(chatId, `❌ Invalid amount in marketplace link (₦100 – ₦20,000).`, mainMenuKeyboard);
+          if (isNaN(amt) || amt < 100 || amt > 1000000) {
+            await sendMessage(chatId, `❌ Invalid amount in marketplace link (₦100 – ₦1,000,000).`, mainMenuKeyboard);
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
@@ -484,7 +484,7 @@ serve(async (req) => {
             return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
           }
 
-          const fee = Math.max(300, Math.round(amt * 0.05));
+          const fee = Math.max(300, Math.round(amt * 0.03));
           const sellerReceives = amt - fee;
           const cleanDesc = sanitizeInput(dlDescription);
 
@@ -553,7 +553,7 @@ serve(async (req) => {
         `• <b>Before acceptance</b> — Buyer/seller can cancel free\n` +
         `• <b>Within 1 hour</b> of payment — Auto-refund\n` +
         `• <b>After 1 hour</b> — Open a dispute for admin review\n\n` +
-        `⚠️ <b>Protection:</b> Dispute if wrong ${DOT} 48h auto-release\n💰 Max: ₦20,000 ${DOT} Fee: 5% (min ₦300)\n${LINE}`,
+        `⚠️ <b>Protection:</b> Dispute if wrong ${DOT} 48h auto-release\n💰 Max: ₦1,000,000 ${DOT} Fee: 3% (min ₦300)\n${LINE}`,
         { inline_keyboard: [[{ text: "➕ New Deal", callback_data: "open_newdeal" }, { text: "📋 My Deals", callback_data: "open_mydeals" }], [{ text: "🔙 Back to Menu", callback_data: "open_start" }]] }
       );
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
@@ -748,8 +748,8 @@ serve(async (req) => {
           { inline_keyboard: [[{ text: "🔄 Try Again", callback_data: "open_newdeal" }]] });
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
-      if (isNaN(amount) || amount < 100 || amount > 20000) {
-        await sendMessage(chatId, `❌ <b>Invalid Amount</b>\n${THIN}\n\nAmount must be ₦100 — ₦20,000`,
+      if (isNaN(amount) || amount < 100 || amount > 1000000) {
+        await sendMessage(chatId, `❌ <b>Invalid Amount</b>\n${THIN}\n\nAmount must be ₦100 — ₦1,000,000`,
           { inline_keyboard: [[{ text: "🔄 Try Again", callback_data: "open_newdeal" }]] });
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
@@ -763,7 +763,7 @@ serve(async (req) => {
         return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
       }
 
-      const fee = Math.max(300, Math.round(amount * 0.05));
+      const fee = Math.max(300, Math.round(amount * 0.03));
       const sellerReceives = amount - fee;
       const dealId = `ESC-${Date.now().toString(36).toUpperCase()}`;
 

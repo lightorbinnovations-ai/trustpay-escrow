@@ -41,16 +41,29 @@ serve(async (req) => {
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
     if (!initData || !botToken) {
-      throw new Error("Missing authentication credentials");
+      console.error("Missing auth headers or bot token");
+      return new Response(JSON.stringify({ error: "Missing authentication credentials" }), { status: 401, headers: corsHeaders });
     }
 
-    const tgUser = validateTelegramWebAppData(initData, botToken);
-    const userTelegramTag = `@${tgUser.username}`;
+    let tgUser;
+    try {
+      tgUser = validateTelegramWebAppData(initData, botToken);
+    } catch (authErr) {
+      console.error("Auth validation failed:", authErr);
+      return new Response(JSON.stringify({ error: `Auth failed: ${authErr.message}` }), { status: 401, headers: corsHeaders });
+    }
+
+    // Handle optional username and avoid "undefined" string literal issues
+    const safeUsername = (tgUser.username && tgUser.username !== "undefined" && tgUser.username !== "null")
+      ? tgUser.username
+      : `user_${tgUser.id}`;
+    const userTelegramTag = `@${safeUsername}`;
 
     // 2. Parse Action
     const { action, payload } = await req.json();
+    console.log(`Action: ${action}, User: ${userTelegramTag}`, payload);
 
-    let result;
+    let result: any = { success: false };
 
     switch (action) {
       case "create_deal": {
@@ -60,7 +73,7 @@ serve(async (req) => {
           throw new Error("Cannot trade with yourself");
         }
 
-        const fee = Math.max(300, Math.round(amount * 0.05));
+        const fee = Math.max(300, Math.round(amount * 0.03));
         const dealId = `ESC-${Date.now().toString(36).toUpperCase()}`;
         const cleanDesc = description.trim().replace(/[<>&]/g, "").substring(0, 200);
 
@@ -89,7 +102,7 @@ serve(async (req) => {
             `📝 ${cleanDesc}\n` +
             `👤 Seller: @${seller.replace("@", "")}\n\n` +
             `💰 Amount: ₦${amount.toLocaleString()}\n` +
-            `💵 Fee (5%): ₦${fee.toLocaleString()}\n` +
+            `💵 Fee (3%): ₦${fee.toLocaleString()}\n` +
             `📤 Seller gets: ₦${sellerReceives.toLocaleString()}\n\n` +
             `⏳ <b>Waiting for seller to accept.</b>\nYou'll be notified when they are ready for payment.\n${LINE}`,
             { inline_keyboard: [[{ text: "🚀 View in App", url: miniAppLink }]] }
@@ -108,7 +121,7 @@ serve(async (req) => {
               `📩 <b>New Escrow Request!</b>\n${LINE}\n\n` +
               `🆔 <code>${dealId}</code>\n` +
               `📝 ${cleanDesc}\n` +
-              `👤 Buyer: @${tgUser.username || "User"}\n\n` +
+              `👤 Buyer: ${tgUser.username ? `@${tgUser.username}` : `User ${tgUser.id}`}\n\n` +
               `💰 Amount: ₦${amount.toLocaleString()}\n` +
               `📤 You'll receive: ₦${sellerReceives.toLocaleString()}\n\n` +
               `👇 <b>Please accept or decline in the app:</b>\n${LINE}`,
@@ -136,11 +149,23 @@ serve(async (req) => {
       case "accept_deal": {
         const { deal_id } = payload;
         // Verify user is the seller
-        const { data: deal } = await supabaseClient.from("deals").select("*").eq("deal_id", deal_id).single();
-        if (!deal || deal.seller_telegram.toLowerCase() !== userTelegramTag.toLowerCase()) {
-          throw new Error("Unauthorized: Only the seller can accept this deal");
+        const { data: deal, error: fetchErr } = await supabaseClient.from("deals").select("*").eq("deal_id", deal_id).maybeSingle();
+
+        if (fetchErr) throw fetchErr;
+        if (!deal) {
+          console.error(`Deal not found: ${deal_id}`);
+          return new Response(JSON.stringify({ error: "Deal not found" }), { status: 404, headers: corsHeaders });
         }
-        if (deal.status !== "pending") throw new Error("Deal is no longer pending");
+
+        const isSeller = deal.seller_telegram.toLowerCase() === userTelegramTag.toLowerCase();
+        if (!isSeller) {
+          console.error(`Unauthorized accept: User ${userTelegramTag} is not Seller ${deal.seller_telegram}`);
+          return new Response(JSON.stringify({ error: "Unauthorized: Only the seller can accept this deal" }), { status: 403, headers: corsHeaders });
+        }
+
+        if (deal.status !== "pending") {
+          return new Response(JSON.stringify({ error: `Deal is no longer pending (current status: ${deal.status})` }), { status: 400, headers: corsHeaders });
+        }
 
         const { error } = await supabaseClient.from("deals").update({ status: "accepted" }).eq("deal_id", deal_id);
         if (error) throw error;

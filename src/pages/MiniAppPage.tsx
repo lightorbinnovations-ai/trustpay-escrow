@@ -149,9 +149,9 @@ const translations = {
         amount: "Amount (₦)",
         description: "Description",
         placeholder_user: "@username",
-        placeholder_amount: "100 – 20,000",
+        placeholder_amount: "100 – 1,000,000",
         placeholder_desc: "What are you buying?",
-        fee_label: "Platform fee (5%)",
+        fee_label: "Platform fee (3%)",
         seller_receives: "Seller receives"
       }
     },
@@ -222,7 +222,7 @@ const translations = {
       },
       questions_header: "Frequently Asked Questions",
       q1: { q: "Is it secure?", a: "Yes! Funds are held until the buyer confirms receipt. If anything goes wrong, you can open a dispute." },
-      q2: { q: "How much does it cost?", a: "We charge a 5% platform fee per transaction to ensure a safe and secure service." },
+      q2: { q: "How much does it cost?", a: "We charge a 3% platform fee per transaction to ensure a safe and secure service." },
       q3: { q: "What if the seller doesn't deliver?", a: "If the seller fails to deliver, you can open a dispute and our team will refund you after verification." }
     },
     history: {
@@ -376,9 +376,9 @@ const translations = {
         amount: "Montant (₦)",
         description: "Description",
         placeholder_user: "@username",
-        placeholder_amount: "100 – 20 000",
+        placeholder_amount: "100 – 1 000 000",
         placeholder_desc: "Qu'achetez-vous ?",
-        fee_label: "Frais de plateforme (5%)",
+        fee_label: "Frais de plateforme (3%)",
         seller_receives: "Le vendeur reçoit"
       }
     },
@@ -1102,9 +1102,9 @@ export default function MiniAppPage() {
   const handleCreateDeal = async () => {
     setError("");
     const seller = sellerUsername.replace("@", "").trim();
-    const amt = parseInt(amount);
+    const amt = parseInt(amount.replace(/,/g, ""));
     if (!seller || seller.length < 3 || !/^[a-zA-Z0-9_]{3,32}$/.test(seller)) { setError("Enter a valid seller username (3-32 chars)"); return; }
-    if (isNaN(amt) || amt < 100 || amt > 20000) { setError("Amount: ₦100 – ₦20,000"); return; }
+    if (isNaN(amt) || amt < 100 || amt > 1000000) { setError("Amount: ₦100 – ₦1,000,000"); return; }
     if (!description.trim() || description.trim().length < 3) { setError("Description too short (min 3 chars)"); return; }
     if (tgUser && seller.toLowerCase() === tgUser.username.toLowerCase()) { setError("Can't trade with yourself"); return; }
 
@@ -2659,8 +2659,18 @@ export default function MiniAppPage() {
                   </div>
                   <div>
                     <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.amount}</label>
-                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={t.new_deal.form.placeholder_amount}
-                      className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`} />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={amount}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
+                        if (!val) { setAmount(""); return; }
+                        setAmount(Number(val).toLocaleString());
+                      }}
+                      placeholder={t.new_deal.form.placeholder_amount}
+                      className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`}
+                    />
                   </div>
                   <div>
                     <label className={`text-[12px] font-semibold uppercase tracking-wider mb-2 block ${textSecondary}`}>{t.new_deal.form.description}</label>
@@ -2668,15 +2678,15 @@ export default function MiniAppPage() {
                       className={`w-full p-3.5 rounded-xl text-[15px] border outline-none input-focus ${inputBg}`} maxLength={200} />
                   </div>
 
-                  {amount && parseInt(amount) >= 100 && parseInt(amount) <= 20000 && (
+                  {amount && parseInt(amount.replace(/,/g, "")) >= 100 && parseInt(amount.replace(/,/g, "")) <= 1000000 && (
                     <div className={`p-3.5 rounded-xl text-[13px] border ${cardBorder} ${isDark ? "bg-white/[0.02]" : "bg-black/[0.015]"}`}>
                       <div className="flex justify-between mb-1">
                         <span className={textSecondary}>{t.new_deal.form.fee_label}</span>
-                        <span className="font-medium">₦{Math.max(300, Math.round(parseInt(amount) * 0.05)).toLocaleString()}</span>
+                        <span className="font-medium">₦{Math.max(300, Math.round(parseInt(amount.replace(/,/g, "")) * 0.03)).toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className={textSecondary}>{t.new_deal.form.seller_receives}</span>
-                        <span className="font-semibold text-emerald-500">₦{(parseInt(amount) - Math.max(300, Math.round(parseInt(amount) * 0.05))).toLocaleString()}</span>
+                        <span className="font-semibold text-emerald-500">₦{(parseInt(amount.replace(/,/g, "")) - Math.max(300, Math.round(parseInt(amount.replace(/,/g, "")) * 0.03))).toLocaleString()}</span>
                       </div>
                     </div>
                   )}

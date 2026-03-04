@@ -77,7 +77,7 @@ export default function DisputesPage() {
         }]);
       }
 
-      const sellerAmount = selectedDeal.amount - selectedDeal.fee;
+      const sellerAmount = selectedDeal.amount - Math.max(300, Math.round(selectedDeal.amount * 0.03));
       toast({
         title: "Dispute resolved",
         description: `${selectedDeal.deal_id} — ${resolution === "refund_buyer" ? "Refunded to buyer" : "Released ₦" + sellerAmount.toLocaleString() + " to seller"}`,
