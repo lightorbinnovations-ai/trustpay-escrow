@@ -547,6 +547,7 @@ export default function MiniAppPage() {
   const [editDescription, setEditDescription] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [homeDeals, setHomeDeals] = useState<Deal[]>([]);
+  const [dbProfile, setDbProfile] = useState<any>(null);
   const [allUserDeals, setAllUserDeals] = useState<Deal[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -636,13 +637,36 @@ export default function MiniAppPage() {
       if (user) {
         const u = user.username?.toString().toLowerCase() || "";
         const isInvalid = !u || u === "undefined" || u === "null";
+        const finalUsername = isInvalid ? `user_${user.id}` : u.replace(/^@/, "");
+
         setTgUser({
           id: user.id,
-          username: isInvalid ? `user_${user.id}` : u.replace(/^@/, ""),
+          username: finalUsername,
           firstName: user.first_name || "",
           lastName: user.last_name || "",
           photoUrl: user.photo_url || ""
         });
+
+        // Background sync profile to DB so it persists
+        const syncProfile = async () => {
+          try {
+            const { data: profile } = await supabase.from("user_profiles").upsert({
+              telegram_id: user.id,
+              telegram_username: `@${finalUsername}`,
+              full_name: `${user.first_name || ""}${user.last_name ? " " + user.last_name : ""}`.trim(),
+              photo_url: user.photo_url || null,
+              updated_at: new Date().toISOString()
+            }, { onConflict: "telegram_id" }).select().single();
+
+            if (profile) setDbProfile(profile);
+          } catch (e) {
+            console.error("Profile sync error:", e);
+            // Fallback fetch if upsert didn't return data
+            const { data } = await supabase.from("user_profiles").select("*").eq("telegram_id", user.id).maybeSingle();
+            if (data) setDbProfile(data);
+          }
+        };
+        syncProfile();
       }
     }
   }, []);
@@ -2581,14 +2605,15 @@ export default function MiniAppPage() {
               <div className={`${cardBg} border ${cardBorder} rounded-2xl p-5 shadow-sm mb-4 mt-2`}>
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-12 h-12 rounded-2xl overflow-hidden bg-gradient-to-br from-[hsl(224,71%,40%)] to-[hsl(224,71%,55%)] flex items-center justify-center">
-                    {tgUser?.photoUrl ? (
-                      <img src={tgUser.photoUrl} alt={`${tgUser.firstName} profile`} className="w-full h-full object-cover" loading="lazy" />
+                    {(tgUser?.photoUrl || dbProfile?.photo_url) ? (
+                      <img src={tgUser?.photoUrl || dbProfile?.photo_url} alt={`${tgUser?.firstName || dbProfile?.full_name} profile`} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <User className="w-6 h-6 text-white" />
                     )}
                   </div>
                   <div>
-                    <p className="font-semibold text-[15px]">{tgUser?.firstName}{tgUser?.lastName ? ` ${tgUser.lastName}` : ""}</p>
+                    <p className="font-semibold text-[15px]">{tgUser?.firstName || dbProfile?.full_name?.split(' ')[0] || "User"}{tgUser?.lastName ? ` ${tgUser.lastName}` : ""}</p>
+
                     <div className="flex items-center gap-2">
                       <p className={`text-[13px] ${textSecondary}`}>@{tgUser?.username}</p>
                       {avgRating !== "—" && (
