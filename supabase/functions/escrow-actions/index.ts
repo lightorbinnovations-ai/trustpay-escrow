@@ -203,48 +203,45 @@ serve(async (req) => {
           return new Response(JSON.stringify({ error: `Deal is no longer pending (current status: ${deal.status})` }), { status: 400, headers: corsHeaders });
         }
 
-        // --- Initialize Paystack Payment Link ---
-        const PAYSTACK_SECRET_KEY = Deno.env.get("PAYSTACK_SECRET_KEY");
-        let payLink = null;
-        let paymentRef = null;
+        // Simply update status to accepted - no external API dependency
+        const { error: updateErr } = await supabaseClient
+          .from("deals")
+          .update({ status: "accepted" })
+          .eq("deal_id", deal_id);
 
-        if (PAYSTACK_SECRET_KEY) {
-          try {
-            const paystackRes = await fetch("https://api.paystack.co/transaction/initialize", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                amount: deal.amount * 100, // Paystack uses Kobo
-                email: `${deal.buyer_telegram.replace("@", "")}@escrowbot.ng`,
-                reference: `${deal_id}-${Date.now()}`,
-                metadata: { deal_id: deal_id, buyer: deal.buyer_telegram, seller: deal.seller_telegram },
-                callback_url: "https://t.me/TrustPay9jaBot",
-              }),
-            });
-            const paystackData = await paystackRes.json();
-            if (paystackData.status && paystackData.data?.authorization_url) {
-              payLink = paystackData.data.authorization_url;
-              paymentRef = paystackData.data.reference;
-            }
-          } catch (pErr) {
-            console.error("Paystack init failed during accept:", pErr);
-          }
-        }
+        if (updateErr) throw updateErr;
 
-        const { error } = await supabaseClient.from("deals").update({
-          status: "accepted",
-          paystack_payment_link: payLink,
-          payment_ref: paymentRef
-        }).eq("deal_id", deal_id);
-
-        if (error) throw error;
-
-        await supabaseClient.from("audit_logs").insert([{ deal_id, action: "deal_accepted", actor: userTelegramTag, details: { amount: deal.amount, buyer: deal.buyer_telegram, pay_link: !!payLink } }]);
+        await supabaseClient.from("audit_logs").insert([{
+          deal_id,
+          action: "deal_accepted",
+          actor: userTelegramTag,
+          details: { amount: deal.amount, buyer: deal.buyer_telegram }
+        }]);
 
         result = { success: true };
 
-        // Notify buyer - deal is accepted and payment is ready
-        supabaseClient.functions.invoke("deal-notify", { body: { deal_id, action: "deal_accepted" } }).catch(e => console.error("Notify error:", e));
+        // Notify buyer via bot
+        try {
+          const { data: buyerProfile } = await supabaseClient
+            .from("bot_users")
+            .select("telegram_id")
+            .ilike("username", deal.buyer_telegram.replace("@", ""))
+            .maybeSingle();
+
+          if (buyerProfile?.telegram_id) {
+            const miniAppLink = `https://t.me/TrustPay9jaBot/app?startapp=deal_${deal_id}`;
+            await sendMessage(botToken, buyerProfile.telegram_id,
+              `✅ <b>Deal Accepted!</b>\n${LINE}\n\n` +
+              `🆔 <code>${deal_id}</code>\n` +
+              `📝 ${deal.description}\n\n` +
+              `💰 Amount: ₦${Number(deal.amount).toLocaleString()}\n\n` +
+              `👇 <b>Proceed to pay in the app:</b>\n${LINE}`,
+              { inline_keyboard: [[{ text: "💳 Pay Now", url: miniAppLink }]] }
+            );
+          }
+        } catch (notifyErr) {
+          console.error("Buyer notification failed:", notifyErr);
+        }
 
         break;
       }
@@ -258,7 +255,7 @@ serve(async (req) => {
         }
         if (deal.status !== "pending") throw new Error("Deal is no longer pending");
 
-        const { error } = await supabaseClient.from("deals").update({ status: "cancelled", completed_at: new Date().toISOString(), dispute_resolution: "declined_by_seller" }).eq("deal_id", deal_id);
+        const { error } = await supabaseClient.from("deals").update({ status: "cancelled" }).eq("deal_id", deal_id);
         if (error) throw error;
 
         // Also notify buyer

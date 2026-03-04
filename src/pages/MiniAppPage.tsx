@@ -2840,6 +2840,9 @@ export default function MiniAppPage() {
 
   // ===== MY DEALS =====
   if (view === "my-deals") {
+    const activeDeals = deals.filter(d => !["completed", "cancelled", "refunded", "declined"].includes(d.status));
+    const historyCount = deals.length - activeDeals.length;
+
     return (
       <div className={`min-h-screen ${bg} ${textPrimary} overflow-x-hidden`}>
         <style>{globalStyles}</style>
@@ -2851,14 +2854,17 @@ export default function MiniAppPage() {
           <Header title={t.deals.header} />
           <div className="px-4 pb-8">
             <AdBanner position="my-deals-top" />
-            <p className={`text-[14px] mb-4 ${textSecondary}`}>{deals.length} {deals.length !== 1 ? t.deals.header.toLowerCase() : t.deals.header.toLowerCase().replace(/s$/, "")}</p>
+            <p className={`text-[14px] mb-4 ${textSecondary}`}>
+              {activeDeals.length} active {activeDeals.length !== 1 ? t.deals.header.toLowerCase() : t.deals.header.toLowerCase().replace(/s$/, "")}
+              {historyCount > 0 && <span className="opacity-60"> · <button onClick={() => navigate("history")} className="underline">{historyCount} in history</button></span>}
+            </p>
 
             {loading ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
                 <Loader2 className="w-7 h-7 animate-spin text-[hsl(224,71%,50%)]" />
                 <p className={`text-[13px] ${textSecondary}`}>{t.deals.loading_deals}</p>
               </div>
-            ) : deals.length === 0 ? (
+            ) : activeDeals.length === 0 ? (
               <StaggerItem index={0}>
                 <div className={`${cardBg} border ${cardBorder} rounded-2xl p-10 text-center shadow-sm`}>
                   <List className={`w-12 h-12 mx-auto mb-3 ${textSecondary}`} />
@@ -2869,7 +2875,7 @@ export default function MiniAppPage() {
               </StaggerItem>
             ) : (
               <div className="space-y-2">
-                {deals.map((deal, i) => {
+                {activeDeals.map((deal, i) => {
                   const st = statusConfig[deal.status] || statusConfig.pending;
                   const isBuyer = usernameMatch(deal.buyer_telegram, `@${tgUser?.username}`);
                   const isSeller = usernameMatch(deal.seller_telegram, `@${tgUser?.username}`);
@@ -2910,6 +2916,7 @@ export default function MiniAppPage() {
       </div>
     );
   }
+
 
   // ===== DEAL DETAIL =====
   if (view === "deal-detail" && selectedDeal) {
